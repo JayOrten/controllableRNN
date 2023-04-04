@@ -91,8 +91,13 @@ def load_tokenized_file(tok_filename):
     with open(tok_filename, "rb") as f:
         return pkl.load(f)
     
+def load_spacy():
+    nlp = spacy.load("en_core_web_sm")
+    return nlp
+    
+# Generates vocabulary and token files for inputs
 def main():
-    # Pass in arguments like : ../data/reviews/music_small
+    # arguments must be formatted like: .\build_vocab.py ..\data\reviews\garden.txt ..\data\reviews\music.txt
     n = len(sys.argv)
     print('arguments: ', sys.argv)
     with open("combined.txt", "w") as outfile:
@@ -103,19 +108,24 @@ def main():
                 contents = infile.read()
                 outfile.write(contents)
 
-    nlp = spacy.load("en_core_web_sm")
+    type = sys.argv[2].split('\\')[2]
+    parent_dir = "..\\vocabs_&_tokens\\" + type
+    if not os.path.isdir(parent_dir):
+        os.mkdir(parent_dir)
+
+    nlp = load_spacy()
     # In order to create the vocab, you have to combine all of the sources
-    vocab = build_and_save_vocab_from_file(nlp, "combined.txt", "mar_2023_lowercase_reviews_small_vocab.pt")
+    vocab = build_and_save_vocab_from_file(nlp, "combined.txt", parent_dir + "\\" + type + "_vocab.pt")
 
     specifiers = []
     # Get the token file tags:
     for i in range(1, n):
-        filename = sys.arv[i]
-        specifiers.append(filename.split('\\')[-1])
+        filename = sys.argv[i]
+        specifiers.append((filename.split('\\')[-1]).split('.')[0]) # extract the token file specifier name (category)
 
     for i in range(1, n):
-        filename = sys.arv[i]
-        output_file = "lowercase_" + specifiers[i] + "_tok.pkl"
+        filename = sys.argv[i]
+        output_file = parent_dir + "\\" + specifiers[i-1] + "_tok.pkl"
         generate_tokenized_file(vocab, nlp, filename, output_file, lowercase=True)
 
     # Remove combined
