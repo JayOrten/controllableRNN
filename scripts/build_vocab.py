@@ -109,7 +109,7 @@ def main():
                 outfile.write(contents)
 
     type = sys.argv[2].split('/')[2]
-    parent_dir = "../vocabs_&_tokens/" + type
+    parent_dir = "../vocabs_and_tokens/" + type
     if not os.path.isdir(parent_dir):
         os.mkdir(parent_dir)
 

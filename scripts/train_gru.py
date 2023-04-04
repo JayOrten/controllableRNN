@@ -25,7 +25,7 @@ class RNN_Dataset_multiple_sources(torch.utils.data.Dataset):
         sequence_length,
         type
     ):
-        folder = "../vocabs_&_tokens/" + type + "/"
+        folder = "../vocabs_and_tokens/" + type + "/"
         data_folder = "../data/" + type + "/"
         vocab_file = folder + "*.pt"
         token_files = folder + "*.pkl"
