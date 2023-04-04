@@ -259,7 +259,7 @@ def main():
     plt.xlabel("Time")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig('loss_' + type + "_" + num_epochs + "_" + hidden_size + '.png')
+    plt.savefig('loss_' + str(type) + "_" + str(num_epochs) + "_" + str(hidden_size) + '.png')
 
 if __name__ == "__main__":
     main()
