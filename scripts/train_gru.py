@@ -210,13 +210,7 @@ def predict_with_category(dataset, model, text, category, next_words=100):
     final_prediction = build_vocab.decode_vocab(dataset.vocab, prediction)
     return final_prediction
 
-
-def main():
-    arguments = sys.argv[1:]
-    type, num_epochs, hidden_size = arguments
-    num_epochs = int(num_epochs)
-    hidden_size = int(hidden_size)
-
+def train_wrapper(type, hidden_size, num_epochs):
     # Create dataset
     dataset = RNN_Dataset_multiple_sources(TRAIN_TOKEN_LEN, type)
     input_size = dataset.uniq_words # Should be size of vocab?
@@ -225,7 +219,7 @@ def main():
     # Model with normal pytorch GRU
     category_model = gru_models.GRU_category(input_size, hidden_size, input_size, n_layers).to(device)
 
-    file_path = f"gru_trained_cat_reviews.pt"
+    file_path = f"gru_trained_cat_" + type + ".pt"
 
     losses_cat = train(dataset, category_model, num_epochs, BATCH_SIZE, cat=True)
 
@@ -234,7 +228,7 @@ def main():
     # Model with GRU Cells
     cells_category_model = gru_models.GRU_with_cells_category(input_size, hidden_size, input_size, n_layers).to(device)
 
-    file_path = f"gru_trained_cat_cells_reviews.pt"
+    file_path = f"gru_trained_cat_cells_" + type + ".pt"
 
     losses_cat_cells = train(dataset, cells_category_model, num_epochs, BATCH_SIZE, True)
 
@@ -243,7 +237,7 @@ def main():
     # Model with edited GRU Cells
     cells_category_edited_model = gru_models.GRU_with_cells_category_edited(input_size, hidden_size, input_size, n_layers).to(device)
 
-    file_path = f"gru_trained_cat_cells_edited_reviews.pt"
+    file_path = f"gru_trained_cat_cells_edited_" + type + ".pt"
 
     losses_cat_cells_edited = train(dataset, cells_category_edited_model, num_epochs, BATCH_SIZE, True)
 
@@ -260,6 +254,21 @@ def main():
     plt.ylabel("Loss")
     plt.legend()
     plt.savefig('loss_' + str(type) + "_" + str(num_epochs) + "_" + str(hidden_size) + '.png')
+
+
+def main():
+    # Uncomment these to use arguments
+    #arguments = sys.argv[1:]
+    #type, num_epochs, hidden_size = arguments
+    #num_epochs = int(num_epochs)
+    #hidden_size = int(hidden_size)
+
+    train_wrapper(type='reviews', hidden_size=256, num_epochs=20)
+    train_wrapper(type='reviews', hidden_size=512, num_epochs=20)
+    train_wrapper(type='languages', hidden_size=256, num_epochs=300)
+    train_wrapper(type='languages', hidden_size=512, num_epochs=300)
+    train_wrapper(type='languages', hidden_size=1024, num_epochs=300)
+    
 
 if __name__ == "__main__":
     main()
