@@ -216,6 +216,9 @@ def train_wrapper(type, hidden_size, num_epochs):
     input_size = dataset.uniq_words # Should be size of vocab?
     n_layers = 3
 
+    print('----------------------')
+    print('Original GRU')
+
     # Model with normal pytorch GRU
     category_model = gru_models.GRU_category(input_size, hidden_size, input_size, n_layers).to(device)
 
@@ -224,6 +227,9 @@ def train_wrapper(type, hidden_size, num_epochs):
     losses_cat = train(dataset, category_model, num_epochs, BATCH_SIZE, cat=True)
 
     torch.save(category_model.state_dict(), file_path)
+
+    print('----------------------')
+    print('Original GRU with cells')
     
     # Model with GRU Cells
     cells_category_model = gru_models.GRU_with_cells_category(input_size, hidden_size, input_size, n_layers).to(device)
@@ -233,6 +239,9 @@ def train_wrapper(type, hidden_size, num_epochs):
     losses_cat_cells = train(dataset, cells_category_model, num_epochs, BATCH_SIZE, True)
 
     torch.save(cells_category_model.state_dict(), file_path)
+
+    print('----------------------')
+    print('Edited GRU')
 
     # Model with edited GRU Cells
     cells_category_edited_model = gru_models.GRU_with_cells_category_edited(input_size, hidden_size, input_size, n_layers).to(device)
@@ -263,10 +272,11 @@ def main():
     #num_epochs = int(num_epochs)
     #hidden_size = int(hidden_size)
 
-    train_wrapper(type='reviews', hidden_size=256, num_epochs=20)
-    train_wrapper(type='reviews', hidden_size=512, num_epochs=20)
+    print('TRAINING LANGUAGES- HIDDEN_SIZE-256 NUM_EPOCHS-300')
     train_wrapper(type='languages', hidden_size=256, num_epochs=300)
+    print('TRAINING LANGUAGES- HIDDEN_SIZE-512 NUM_EPOCHS-300')
     train_wrapper(type='languages', hidden_size=512, num_epochs=300)
+    print('TRAINING LANGUAGES- HIDDEN_SIZE-1024 NUM_EPOCHS-300')
     train_wrapper(type='languages', hidden_size=1024, num_epochs=300)
     
 
