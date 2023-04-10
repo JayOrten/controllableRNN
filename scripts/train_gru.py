@@ -6,6 +6,7 @@ import random
 import os
 import glob
 import sys
+import wandb
 
 import gru_models
 import build_vocab
@@ -116,6 +117,7 @@ class RNN_Dataset_multiple_sources(torch.utils.data.Dataset):
         )
 
 def train(dataset, model, max_epochs, batch_size, cat = False):
+    
     train_losses = []
 
     model.train()
@@ -151,8 +153,11 @@ def train(dataset, model, max_epochs, batch_size, cat = False):
             optimizer.step()
 
             print({ 'epoch': epoch, 'batch': batch, 'loss': loss.item() })
+            wandb.log({"loss":loss.item()})
 
-        train_losses.append(total_loss/batch_size)
+        batch_loss = total_loss/batch_size
+        train_losses.append(batch_loss)
+        wandb.log({"batch_loss":batch_loss})
 
     return train_losses
 
@@ -219,6 +224,15 @@ def train_wrapper(type, hidden_size, num_epochs):
     print('----------------------')
     print('Original GRU')
 
+    run = wandb.init(name='Original GRU',
+                     project='controllableRNN',
+                     config={
+                        'dataset':type,
+                        'epochs':num_epochs,
+                        'hidden_size':hidden_size
+                     }
+                     )
+
     # Model with normal pytorch GRU
     category_model = gru_models.GRU_category(input_size, hidden_size, input_size, n_layers).to(device)
 
@@ -228,7 +242,7 @@ def train_wrapper(type, hidden_size, num_epochs):
 
     torch.save(category_model.state_dict(), file_path)
 
-    print('----------------------')
+    """print('----------------------')
     print('Original GRU with cells')
     
     # Model with GRU Cells
@@ -238,10 +252,19 @@ def train_wrapper(type, hidden_size, num_epochs):
 
     losses_cat_cells = train(dataset, cells_category_model, num_epochs, BATCH_SIZE, True)
 
-    torch.save(cells_category_model.state_dict(), file_path)
+    torch.save(cells_category_model.state_dict(), file_path)"""
 
     print('----------------------')
     print('Edited GRU')
+
+    run = wandb.init(name='Edited GRU',
+                     project='controllableRNN',
+                     config={
+                        'dataset':type,
+                        'epochs':num_epochs,
+                        'hidden_size':hidden_size
+                     }
+                     )
 
     # Model with edited GRU Cells
     cells_category_edited_model = gru_models.GRU_with_cells_category_edited(input_size, hidden_size, input_size, n_layers).to(device)
@@ -253,19 +276,20 @@ def train_wrapper(type, hidden_size, num_epochs):
     torch.save(cells_category_edited_model.state_dict(), file_path)
 
     # Create loss graph and save
-    fig = plt.figure()
+    """fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(range(len(losses_cat)), losses_cat, label="original")
-    ax.plot(range(len(losses_cat_cells)), losses_cat_cells, label="original with cells")
+    #ax.plot(range(len(losses_cat_cells)), losses_cat_cells, label="original with cells")
     ax.plot(range(len(losses_cat_cells_edited)), losses_cat_cells_edited, label="edited")
     plt.title("Loss over time")
     plt.xlabel("Time")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig('loss_' + str(type) + "_" + str(num_epochs) + "_" + str(hidden_size) + '.png')
+    plt.savefig('loss_' + str(type) + "_" + str(num_epochs) + "_" + str(hidden_size) + '.png')"""
 
 
 def main():
+    wandb.login() # login to wandb
     # Uncomment these to use arguments
     #arguments = sys.argv[1:]
     #type, num_epochs, hidden_size = arguments
@@ -273,11 +297,11 @@ def main():
     #hidden_size = int(hidden_size)
 
     print('TRAINING LANGUAGES- HIDDEN_SIZE-256 NUM_EPOCHS-300')
-    train_wrapper(type='languages', hidden_size=256, num_epochs=300)
-    print('TRAINING LANGUAGES- HIDDEN_SIZE-512 NUM_EPOCHS-300')
-    train_wrapper(type='languages', hidden_size=512, num_epochs=300)
-    print('TRAINING LANGUAGES- HIDDEN_SIZE-1024 NUM_EPOCHS-300')
-    train_wrapper(type='languages', hidden_size=1024, num_epochs=300)
+    train_wrapper(type='languages', hidden_size=256, num_epochs=150)
+    #print('TRAINING LANGUAGES- HIDDEN_SIZE-512 NUM_EPOCHS-300')
+    #train_wrapper(type='languages', hidden_size=512, num_epochs=150)
+    #print('TRAINING LANGUAGES- HIDDEN_SIZE-1024 NUM_EPOCHS-300')
+    #train_wrapper(type='languages', hidden_size=1024, num_epochs=150)
     
 
 if __name__ == "__main__":
