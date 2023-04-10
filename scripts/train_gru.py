@@ -302,7 +302,7 @@ def main():
     #hidden_size = int(hidden_size)
 
     print('TRAINING LANGUAGES- HIDDEN_SIZE-256 NUM_EPOCHS-300')
-    train_wrapper(type='languages', hidden_size=256, num_epochs=25)
+    train_wrapper(type='languages', hidden_size=256, num_epochs=150)
     #print('TRAINING LANGUAGES- HIDDEN_SIZE-512 NUM_EPOCHS-300')
     #train_wrapper(type='languages', hidden_size=512, num_epochs=150)
     #print('TRAINING LANGUAGES- HIDDEN_SIZE-1024 NUM_EPOCHS-300')
