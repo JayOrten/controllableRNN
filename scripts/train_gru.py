@@ -224,13 +224,14 @@ def train_wrapper(type, hidden_size, num_epochs):
     print('----------------------')
     print('Original GRU')
 
-    wandb.init(name='Original GRU',
+    run = wandb.init(name='Original GRU',
                      project='controllableRNN',
                      config={
                         'dataset':type,
                         'epochs':num_epochs,
                         'hidden_size':hidden_size
-                     }
+                     },
+                    reinit=True
                      )
 
     # Model with normal pytorch GRU
@@ -241,6 +242,8 @@ def train_wrapper(type, hidden_size, num_epochs):
     losses_cat = train(dataset, category_model, num_epochs, BATCH_SIZE, cat=True)
 
     torch.save(category_model.state_dict(), file_path)
+
+    run.finish()
 
     """print('----------------------')
     print('Original GRU with cells')
@@ -257,14 +260,15 @@ def train_wrapper(type, hidden_size, num_epochs):
     print('----------------------')
     print('Edited GRU')
 
-    wandb.init(name='Edited GRU',
+    run = wandb.init(name='Edited GRU',
                      project='controllableRNN',
                      config={
                         'dataset':type,
                         'epochs':num_epochs,
                         'hidden_size':hidden_size
-                     }
-                     )
+                     },
+                reinit=True
+            )
 
     # Model with edited GRU Cells
     cells_category_edited_model = gru_models.GRU_with_cells_category_edited(input_size, hidden_size, input_size, n_layers).to(device)
@@ -274,6 +278,7 @@ def train_wrapper(type, hidden_size, num_epochs):
     losses_cat_cells_edited = train(dataset, cells_category_edited_model, num_epochs, BATCH_SIZE, True)
 
     torch.save(cells_category_edited_model.state_dict(), file_path)
+    run.finish()
 
     # Create loss graph and save
     """fig = plt.figure()
