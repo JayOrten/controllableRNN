@@ -224,7 +224,7 @@ def train_wrapper(type, hidden_size, num_epochs):
     print('----------------------')
     print('Original GRU')
 
-    run = wandb.init(name='Original GRU',
+    wandb.init(name='Original GRU',
                      project='controllableRNN',
                      config={
                         'dataset':type,
@@ -257,7 +257,7 @@ def train_wrapper(type, hidden_size, num_epochs):
     print('----------------------')
     print('Edited GRU')
 
-    run = wandb.init(name='Edited GRU',
+    wandb.init(name='Edited GRU',
                      project='controllableRNN',
                      config={
                         'dataset':type,
@@ -297,7 +297,7 @@ def main():
     #hidden_size = int(hidden_size)
 
     print('TRAINING LANGUAGES- HIDDEN_SIZE-256 NUM_EPOCHS-300')
-    train_wrapper(type='languages', hidden_size=256, num_epochs=150)
+    train_wrapper(type='languages', hidden_size=256, num_epochs=25)
     #print('TRAINING LANGUAGES- HIDDEN_SIZE-512 NUM_EPOCHS-300')
     #train_wrapper(type='languages', hidden_size=512, num_epochs=150)
     #print('TRAINING LANGUAGES- HIDDEN_SIZE-1024 NUM_EPOCHS-300')
