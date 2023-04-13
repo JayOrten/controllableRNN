@@ -13,10 +13,11 @@ import build_vocab
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# TODO: Get rid of these, just pass them in to dataset.
 BATCH_SIZE=16
 TRAIN_TOKEN_LEN=256
 
-#from vocab_building import load_tokenized_file, load_vocab, decode_vocab, nlp, get_vocab_indx_vector
+#from vocab_building impor  t load_tokenized_file, load_vocab, decode_vocab, nlp, get_vocab_indx_vector
 
 def find_files(path): return glob.glob(path)
 
