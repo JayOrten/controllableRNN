@@ -108,7 +108,7 @@ def main():
                 contents = infile.read()
                 outfile.write(contents)
 
-    type = sys.argv[2].split('\\')[2]
+    type = sys.argv[2].split('/')[2]
     parent_dir = "../vocabs_and_tokens/" + type
     if not os.path.isdir(parent_dir):
         os.mkdir(parent_dir)
