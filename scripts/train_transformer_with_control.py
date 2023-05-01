@@ -27,8 +27,8 @@ class Transformer_Dataset(torch.utils.data.Dataset):
         batch_size,
         tag_type
     ):
-        folder = "C:\\Users\\jayor\\Documents\\repos\\controllableRNN\\vocabs_and_tokens\\" + tag_type + "\\"
-        data_folder = "C:\\Users\\jayor\\Documents\\repos\\controllableRNN\\data\\" + tag_type + "\\"
+        folder = "../vocabs_and_tokens/" + tag_type + "/"
+        data_folder = "../data/" + tag_type + "/"
         vocab_file = folder + "*.pt"
         token_files = folder + "*.pkl"
         self.sequence_length = sequence_length
@@ -328,7 +328,7 @@ def train_wrapper():
 
     train(model, dataset, batch_size, sequence_length, num_epochs, ntokens, lr, type=1)
 
-    file_path = f"C:\\Users\\jayor\\Documents\\repos\\controllableRNN\\scripts\\trained_models\\transformer_trained_normal.pt"
+    file_path = f"./trained_models/transformer_trained_normal.pt"
 
     torch.save(model.state_dict(), file_path)
 
@@ -354,7 +354,7 @@ def train_wrapper():
 
     train(model, dataset, batch_size, sequence_length, num_epochs, ntokens, lr, type=0)
 
-    file_path = f"C:\\Users\\jayor\\Documents\\repos\\controllableRNN\\scripts\\trained_models\\transformer_trained_edited1.pt"
+    file_path = f"./trained_models/transformer_trained_edited1.pt"
 
     torch.save(model.state_dict(), file_path)
 
@@ -380,7 +380,7 @@ def train_wrapper():
 
     train(model, dataset, batch_size, sequence_length, num_epochs, ntokens, lr, type=0)
 
-    file_path = f"C:\\Users\\jayor\\Documents\\repos\\controllableRNN\\scripts\\trained_models\\transformer_trained_edited2.pt"
+    file_path = f"./trained_models/transformer_trained_edited2.pt"
 
     torch.save(model.state_dict(), file_path)
 
@@ -406,7 +406,7 @@ def train_wrapper():
 
     train(model, dataset, batch_size, sequence_length, num_epochs, ntokens, lr, type=0)
 
-    file_path = f"C:\\Users\\jayor\\Documents\\repos\\controllableRNN\\scripts\\trained_models\\transformer_trained_edited3.pt"
+    file_path = f"./trained_models/transformer_trained_edited3.pt"
 
     torch.save(model.state_dict(), file_path)
 
@@ -432,7 +432,7 @@ def train_wrapper():
 
     train(model, dataset, batch_size, sequence_length, num_epochs, ntokens, lr, type=0)
 
-    file_path = f"C:\\Users\\jayor\\Documents\\repos\\controllableRNN\\scripts\\trained_models\\transformer_trained_edited4.pt"
+    file_path = f"./trained_models/transformer_trained_edited4.pt"
 
     torch.save(model.state_dict(), file_path)
 

@@ -109,23 +109,23 @@ def main():
                 outfile.write(contents)
 
     type = sys.argv[2].split('\\')[2]
-    parent_dir = "..\\vocabs_and_tokens\\" + type
+    parent_dir = "../vocabs_and_tokens/" + type
     if not os.path.isdir(parent_dir):
         os.mkdir(parent_dir)
 
     nlp = load_spacy()
     # In order to create the vocab, you have to combine all of the sources
-    vocab = build_and_save_vocab_from_file(nlp, "combined.txt", parent_dir + "\\" + type + "_vocab.pt")
+    vocab = build_and_save_vocab_from_file(nlp, "combined.txt", parent_dir + "/" + type + "_vocab.pt")
 
     specifiers = []
     # Get the token file tags:
     for i in range(1, n):
         filename = sys.argv[i]
-        specifiers.append((filename.split('\\')[-1]).split('.')[0]) # extract the token file specifier name (category)
+        specifiers.append((filename.split('/')[-1]).split('.')[0]) # extract the token file specifier name (category)
 
     for i in range(1, n):
         filename = sys.argv[i]
-        output_file = parent_dir + "\\" + specifiers[i-1] + "_tok.pkl"
+        output_file = parent_dir + "/" + specifiers[i-1] + "_tok.pkl"
         generate_tokenized_file(vocab, nlp, filename, output_file, lowercase=True)
 
     # Remove combined
