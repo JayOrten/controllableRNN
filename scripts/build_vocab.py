@@ -2,6 +2,7 @@
 
 import pickle as pkl
 import spacy
+from spacy.symbols import ORTH
 import re
 import torchtext.vocab
 from torchtext.vocab import build_vocab_from_iterator
@@ -32,7 +33,7 @@ def build_vocabulary_from_file(spacy_en, filename: str, lowercase=True):
     vocab = build_vocab_from_iterator(
         yield_tokens(train, tokenize_en),
         min_freq=1,
-        specials=["<s>", "</s>", "<blank>", "<unk>"],
+        specials=["<greatgatsby>", "<shakespeare>", "<s>", "</s>", "<blank>", "<unk>"],
     )
 
     vocab.set_default_index(vocab["<unk>"])
@@ -41,9 +42,6 @@ def build_vocabulary_from_file(spacy_en, filename: str, lowercase=True):
 
 def load_vocab(filename: str):
     if not exists(filename):
-        # vocab = build_vocabulary_from_file(nlp, filename)
-        # torch.save((vocab), filename)
-        # From now on, I should use one function to build and save a new vocab, and another to load it. This is the load function
         raise Exception
     else:
         vocab = torch.load(filename)
@@ -93,6 +91,8 @@ def load_tokenized_file(tok_filename):
     
 def load_spacy():
     nlp = spacy.load("en_core_web_sm")
+    nlp.tokenizer.add_special_case("<shakespeare>", [{"ORTH": "<shakespeare>"}])
+    nlp.tokenizer.add_special_case("<greatgatsby>", [{"ORTH": "<greatgatsby>"}])
     return nlp
     
 # Generates vocabulary and token files for inputs
@@ -100,32 +100,32 @@ def main():
     # arguments must be formatted like: .\build_vocab.py ..\data\reviews\garden.txt ..\data\reviews\music.txt
     n = len(sys.argv)
     print('arguments: ', sys.argv)
-    with open("combined.txt", "w") as outfile:
+    with open("combined.txt", "w", encoding='utf-8', errors='ignore') as outfile:
         for i in range(1, n):
             filename = sys.argv[i]
             print('filename: ', filename)
-            with open(filename) as infile:
+            with open(filename, encoding='utf-8', errors='ignore') as infile:
                 contents = infile.read()
                 outfile.write(contents)
 
-    type = sys.argv[2].split('/')[2]
-    parent_dir = "../vocabs_and_tokens/" + type
+    type = sys.argv[2].split('\\')[2]
+    parent_dir = "..\\vocabs_and_tokens\\" + type
     if not os.path.isdir(parent_dir):
         os.mkdir(parent_dir)
 
     nlp = load_spacy()
     # In order to create the vocab, you have to combine all of the sources
-    vocab = build_and_save_vocab_from_file(nlp, "combined.txt", parent_dir + "/" + type + "_vocab.pt")
+    vocab = build_and_save_vocab_from_file(nlp, "combined.txt", parent_dir + "\\" + type + "_vocab.pt")
 
     specifiers = []
     # Get the token file tags:
     for i in range(1, n):
         filename = sys.argv[i]
-        specifiers.append((filename.split('/')[-1]).split('.')[0]) # extract the token file specifier name (category)
+        specifiers.append((filename.split('\\')[-1]).split('.')[0]) # extract the token file specifier name (category)
 
     for i in range(1, n):
         filename = sys.argv[i]
-        output_file = parent_dir + "/" + specifiers[i-1] + "_tok.pkl"
+        output_file = parent_dir + "\\" + specifiers[i-1] + "_tok.pkl"
         generate_tokenized_file(vocab, nlp, filename, output_file, lowercase=True)
 
     # Remove combined

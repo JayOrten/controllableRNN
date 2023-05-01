@@ -1,4 +1,5 @@
 import math
+import copy
 from typing import Optional, Any, Union, Callable
 
 import torch
@@ -6,19 +7,21 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
-
-class TransformerModel(nn.Module):
+# This model only concatenates control info between encoder cells (at the very end)
+# It also does it before positional encoding
+class TransformerModel_with_Category_edited(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int,
                  nlayers: int, dropout: float = 0.5):
         super().__init__()
         self.model_type = 'Transformer'
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        self.pos_encoder = PositionalEncoding(d_model*2, dropout)
+        encoder_layers = TransformerEncoderLayer_edited(d_model*2, nhead, d_hid, dropout, batch_first=True)
+        self.transformer_encoder = TransformerEncoder_edited(encoder_layers, nlayers)
         self.encoder = nn.Embedding(ntoken, d_model)
+        self.category_embedding = nn.Embedding(2, d_model)
         self.d_model = d_model
-        self.decoder = nn.Linear(d_model, ntoken)
+        self.decoder = nn.Linear(d_model*2, ntoken)
 
         self.init_weights()
 
@@ -28,7 +31,7 @@ class TransformerModel(nn.Module):
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
-    def forward(self, src: Tensor, src_mask: Tensor) -> Tensor:
+    def forward(self, src: Tensor, category: Tensor, src_mask: Tensor = None) -> Tensor:
         """
         Args:
             src: Tensor, shape [seq_len, batch_size]
@@ -38,51 +41,145 @@ class TransformerModel(nn.Module):
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
         src = self.encoder(src) * math.sqrt(self.d_model)
-        src = self.pos_encoder(src)
-        output = self.transformer_encoder(src, src_mask)
+        cat = self.category_embedding(category)
+        cat = cat.expand(src.size()[0], src.size()[1], 200)
+        # Concatenate to every token embedding
+        combined = torch.cat((cat, src), dim=2)
+        src = self.pos_encoder(combined)
+        output = self.transformer_encoder(src, cat, src_mask)
         output = self.decoder(output)
         return output
+    
+class TransformerEncoder_edited(nn.Module):
+    __constants__ = ['norm']
 
-# TODO: Finish building this
-class TransformerModel_edited(nn.Module):
-
-    def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int,
-                 nlayers: int, dropout: float = 0.5):
+    def __init__(self, encoder_layer, num_layers, norm=None, enable_nested_tensor=True, mask_check=True):
         super().__init__()
-        self.model_type = 'Transformer'
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = TransformerEncoderLayer_edited(d_model, nhead, d_hid, dropout)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        self.encoder = nn.Embedding(ntoken, d_model)
-        self.d_model = d_model
-        self.decoder = nn.Linear(d_model, ntoken)
+        torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
+        self.layers = _get_clones(encoder_layer, num_layers)
+        self.num_layers = num_layers
+        self.norm = norm
+        self.enable_nested_tensor = enable_nested_tensor
+        self.mask_check = mask_check
 
-        self.init_weights()
+    def forward(
+            self,
+            src: Tensor,
+            cat: Tensor,
+            mask: Optional[Tensor] = None,
+            src_key_padding_mask: Optional[Tensor] = None,
+            is_causal: Optional[bool] = None) -> Tensor:
+        
+        src_key_padding_mask = F._canonical_mask(
+            mask=src_key_padding_mask,
+            mask_name="src_key_padding_mask",
+            other_type=F._none_or_dtype(mask),
+            other_name="mask",
+            target_type=src.dtype
+        )
 
-    def init_weights(self) -> None:
-        initrange = 0.1
-        self.encoder.weight.data.uniform_(-initrange, initrange)
-        self.decoder.bias.data.zero_()
-        self.decoder.weight.data.uniform_(-initrange, initrange)
+        mask = F._canonical_mask(
+            mask=mask,
+            mask_name="mask",
+            other_type=None,
+            other_name="",
+            target_type=src.dtype,
+            check_other=False,
+        )
 
-    def forward(self, src: Tensor, src_mask: Tensor) -> Tensor:
-        """
-        Args:
-            src: Tensor, shape [seq_len, batch_size]
-            src_mask: Tensor, shape [seq_len, seq_len]
+        output = src
+        convert_to_nested = False
+        first_layer = self.layers[0]
+        src_key_padding_mask_for_layers = src_key_padding_mask
+        why_not_sparsity_fast_path = ''
+        str_first_layer = "self.layers[0]"
+        if not isinstance(first_layer, torch.nn.TransformerEncoderLayer):
+            why_not_sparsity_fast_path = f"{str_first_layer} was not TransformerEncoderLayer"
+        elif first_layer.norm_first :
+            why_not_sparsity_fast_path = f"{str_first_layer}.norm_first was True"
+        elif first_layer.training:
+            why_not_sparsity_fast_path = f"{str_first_layer} was in training mode"
+        elif not first_layer.self_attn.batch_first:
+            why_not_sparsity_fast_path = f" {str_first_layer}.self_attn.batch_first was not True"
+        elif not first_layer.self_attn._qkv_same_embed_dim:
+            why_not_sparsity_fast_path = f"{str_first_layer}.self_attn._qkv_same_embed_dim was not True"
+        elif not first_layer.activation_relu_or_gelu:
+            why_not_sparsity_fast_path = f" {str_first_layer}.activation_relu_or_gelu was not True"
+        elif not (first_layer.norm1.eps == first_layer.norm2.eps) :
+            why_not_sparsity_fast_path = f"{str_first_layer}.norm1.eps was not equal to {str_first_layer}.norm2.eps"
+        elif not src.dim() == 3:
+            why_not_sparsity_fast_path = f"input not batched; expected src.dim() of 3 but got {src.dim()}"
+        elif not self.enable_nested_tensor:
+            why_not_sparsity_fast_path = "enable_nested_tensor was not True"
+        elif src_key_padding_mask is None:
+            why_not_sparsity_fast_path = "src_key_padding_mask was None"
+        elif (((not hasattr(self, "mask_check")) or self.mask_check)
+                and not torch._nested_tensor_from_mask_left_aligned(src, src_key_padding_mask.logical_not())):
+            why_not_sparsity_fast_path = "mask_check enabled, and src and src_key_padding_mask was not left aligned"
+        elif output.is_nested:
+            why_not_sparsity_fast_path = "NestedTensor input is not supported"
+        elif mask is not None:
+            why_not_sparsity_fast_path = "src_key_padding_mask and mask were both supplied"
+        elif first_layer.self_attn.num_heads % 2 == 1:
+            why_not_sparsity_fast_path = "num_head is odd"
+        elif torch.is_autocast_enabled():
+            why_not_sparsity_fast_path = "autocast is enabled"
 
-        Returns:
-            output Tensor of shape [seq_len, batch_size, ntoken]
-        """
-        src = self.encoder(src) * math.sqrt(self.d_model)
-        src = self.pos_encoder(src)
-        output = self.transformer_encoder(src, src_mask)
-        output = self.decoder(output)
+        if not why_not_sparsity_fast_path:
+            tensor_args = (
+                src,
+                first_layer.self_attn.in_proj_weight,
+                first_layer.self_attn.in_proj_bias,
+                first_layer.self_attn.out_proj.weight,
+                first_layer.self_attn.out_proj.bias,
+                first_layer.norm1.weight,
+                first_layer.norm1.bias,
+                first_layer.norm2.weight,
+                first_layer.norm2.bias,
+                first_layer.linear1.weight,
+                first_layer.linear1.bias,
+                first_layer.linear2.weight,
+                first_layer.linear2.bias,
+            )
+
+            if torch.overrides.has_torch_function(tensor_args):
+                why_not_sparsity_fast_path = "some Tensor argument has_torch_function"
+            elif not (src.is_cuda or 'cpu' in str(src.device)):
+                why_not_sparsity_fast_path = "src is neither CUDA nor CPU"
+            elif torch.is_grad_enabled() and any(x.requires_grad for x in tensor_args):
+                why_not_sparsity_fast_path = ("grad is enabled and at least one of query or the "
+                                              "input/output projection weights or biases requires_grad")
+
+            if (not why_not_sparsity_fast_path) and (src_key_padding_mask is not None):
+                convert_to_nested = True
+                output = torch._nested_tensor_from_mask(output, src_key_padding_mask.logical_not(), mask_check=False)
+                src_key_padding_mask_for_layers = None
+
+        # Prevent type refinement
+        make_causal = (is_causal is True)
+
+        if is_causal is None:
+            if mask is not None:
+                sz = mask.size(0)
+                causal_comparison = torch.triu(
+                    torch.ones(sz, sz, device=mask.device) * float('-inf'), diagonal=1
+                ).to(mask.dtype)
+
+                if torch.equal(mask, causal_comparison):
+                    make_causal = True
+
+        is_causal = make_causal
+
+        for mod in self.layers:
+            output = mod(output, cat, src_mask=mask, is_causal=is_causal, src_key_padding_mask=src_key_padding_mask_for_layers)
+
+        if convert_to_nested:
+            output = output.to_padded_tensor(0.)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
         return output
-
-def generate_square_subsequent_mask(sz: int) -> Tensor:
-    """Generates an upper-triangular matrix of -inf, with zeros on diag."""
-    return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
 
 class TransformerEncoderLayer_edited(nn.Module):
     __constants__ = ['batch_first', 'norm_first']
@@ -105,6 +202,8 @@ class TransformerEncoderLayer_edited(nn.Module):
         self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
+
+        self.final_linear = nn.Linear(d_model, d_model//2)
 
         # Legacy string support for activation function.
         if isinstance(activation, str):
@@ -223,15 +322,16 @@ class TransformerEncoderLayer_edited(nn.Module):
                     merged_mask,
                     mask_type,
                 )
-
-
         x = src
         if self.norm_first:
             x = x + self._sa_block(self.norm1(x), src_mask, src_key_padding_mask)
             x = x + self._ff_block(self.norm2(x))
         else:
             x = self.norm1(x + self._sa_block(x, src_mask, src_key_padding_mask))
-            x = self.norm2(x + self._ff_block(x))
+            x = self.norm2(x + self._ff_block(x, cat))
+        # Append here
+        x = self.final_linear(x)
+        x = torch.cat((x, cat), dim=2)
 
         return x
 
@@ -246,8 +346,9 @@ class TransformerEncoderLayer_edited(nn.Module):
         return self.dropout1(x)
 
     # feed forward block
-    def _ff_block(self, x: Tensor) -> Tensor:
-        x = self.linear2(self.dropout(self.activation(self.linear1(x))))
+    def _ff_block(self, x: Tensor, cat) -> Tensor:
+        x = self.dropout(self.activation(self.linear1(x)))
+        x = self.linear2(x)
         return self.dropout2(x)
     
 def _get_activation_fn(activation: str) -> Callable[[Tensor], Tensor]:
@@ -260,7 +361,6 @@ def _get_activation_fn(activation: str) -> Callable[[Tensor], Tensor]:
 
 
 class PositionalEncoding(nn.Module):
-
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -279,3 +379,11 @@ class PositionalEncoding(nn.Module):
         """
         x = x + self.pe[:x.size(0)]
         return self.dropout(x)
+    
+def generate_square_subsequent_mask(sz: int) -> Tensor:
+    """Generates an upper-triangular matrix of -inf, with zeros on diag."""
+    return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
+
+def _get_clones(module, N):
+    # FIXME: copy.deepcopy() is not defined on nn.module
+    return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
