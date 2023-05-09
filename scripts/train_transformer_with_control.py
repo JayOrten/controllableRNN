@@ -142,6 +142,7 @@ def train(model: nn.Module,
           ntokens: int,
           lr: float,
           type=0) -> None:
+    print('REACHED')
     model.train()  # turn on train mode
     dataloader = DataLoader(dataset, batch_size=batch_size, drop_last=True)
     criterion = nn.CrossEntropyLoss()
@@ -166,10 +167,10 @@ def train(model: nn.Module,
         for batch, (x, y, category) in enumerate(dataloader):
             model.train()
 
-            output = model(x, category, src_mask)
             print('x size: ', x.size())
             print('category size: ',category.size())
             print('src_mask size: ',src_mask.size())
+            output = model(x, category, src_mask)
 
             loss = criterion(output.transpose(1, 2), y)
 
