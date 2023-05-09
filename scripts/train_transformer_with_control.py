@@ -319,14 +319,14 @@ def train_wrapper():
     nhead = 2  # number of heads in nn.MultiheadAttention
     dropout = 0.2  # dropout probability
     lrs = [0.0001, 0.001, 0.01]  # learning rates
-    num_epochs = 1
+    #num_epochs = 1
     
     # Normal
     print('---------------------')
     print('NORMAL')
     
     # for each learning rate
-    """for lr in lrs:
+    for lr in lrs:
 
         #BOOKS
 
@@ -334,7 +334,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_books,
-                            'epochs':num_epochs,
+                            'epochs':100,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -343,7 +343,7 @@ def train_wrapper():
         
         model = transformer_model_category.TransformerModel_with_Category(ntokens_books, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, books_dataset, batch_size, sequence_length, num_epochs, ntokens_books, lr, type=1)
+        train(model, books_dataset, batch_size, sequence_length, 100, ntokens_books, lr, type=1)
 
         file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books+"_"+str(lr)+".pt"
 
@@ -359,7 +359,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_reviews,
-                            'epochs':num_epochs,
+                            'epochs':10,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -368,7 +368,7 @@ def train_wrapper():
         
         model = transformer_model_category.TransformerModel_with_Category(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=1)
+        train(model, reviews_dataset, batch_size, sequence_length, 10, ntokens_reviews, lr, type=1)
 
         file_path = f"./trained_models/transformer_trained_normal_"+tag_type_reviews+"_"+str(lr)+".pt"
 
@@ -384,7 +384,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_scripts,
-                            'epochs':num_epochs,
+                            'epochs':100,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -393,7 +393,7 @@ def train_wrapper():
         
         model = transformer_model_category.TransformerModel_with_Category(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=1)
+        train(model, scripts_dataset, batch_size, sequence_length, 100, ntokens_scripts, lr, type=1)
 
         file_path = f"./trained_models/transformer_trained_normal_"+tag_type_scripts+"_"+str(lr)+".pt"
 
@@ -401,7 +401,7 @@ def train_wrapper():
 
         #predict_wrapper(model, scripts_dataset)
 
-        run.finish()"""
+        run.finish()
 
     """# Edited 1
     print('---------------------')
@@ -460,7 +460,7 @@ def train_wrapper():
     print('EDITED 3')
 
     # for each learning rate
-    """for lr in lrs:
+    for lr in lrs:
 
         #BOOKS
 
@@ -468,7 +468,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_books,
-                            'epochs':num_epochs,
+                            'epochs':100,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -477,7 +477,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, books_dataset, batch_size, sequence_length, num_epochs, ntokens_books, lr, type=0)
+        train(model, books_dataset, batch_size, sequence_length, 100, ntokens_books, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books+"_"+str(lr)+".pt"
 
@@ -493,7 +493,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_reviews,
-                            'epochs':num_epochs,
+                            'epochs':10,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -502,7 +502,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=0)
+        train(model, reviews_dataset, batch_size, sequence_length, 10, ntokens_reviews, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_reviews+"_"+str(lr)+".pt"
 
@@ -518,7 +518,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_scripts,
-                            'epochs':num_epochs,
+                            'epochs':100,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -527,7 +527,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=0)
+        train(model, scripts_dataset, batch_size, sequence_length, 100, ntokens_scripts, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_scripts+"_"+str(lr)+".pt"
 
@@ -535,7 +535,7 @@ def train_wrapper():
 
         #predict_wrapper(model, scripts_dataset)
 
-        run.finish()"""
+        run.finish()
 
     # Edited 3.2
     print('---------------------')
@@ -550,7 +550,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_books,
-                            'epochs':num_epochs,
+                            'epochs':100,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -559,7 +559,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3_2.TransformerModel_with_Category_edited(ntokens_books, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, books_dataset, batch_size, sequence_length, num_epochs, ntokens_books, lr, type=0)
+        train(model, books_dataset, batch_size, sequence_length, 100, ntokens_books, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_2_"+tag_type_books+"_"+str(lr)+".pt"
 
@@ -575,7 +575,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_reviews,
-                            'epochs':num_epochs,
+                            'epochs':10,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -584,7 +584,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3_2.TransformerModel_with_Category_edited(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=0)
+        train(model, reviews_dataset, batch_size, sequence_length, 10, ntokens_reviews, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_2_"+tag_type_reviews+"_"+str(lr)+".pt"
 
@@ -600,7 +600,7 @@ def train_wrapper():
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_scripts,
-                            'epochs':num_epochs,
+                            'epochs':100,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -609,7 +609,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3_2.TransformerModel_with_Category_edited(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=0)
+        train(model, scripts_dataset, batch_size, sequence_length, 100, ntokens_scripts, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_2_"+tag_type_scripts+"_"+str(lr)+".pt"
 

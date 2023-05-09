@@ -44,8 +44,6 @@ class TransformerModel_with_Category_edited(nn.Module):
         cat = self.category_embedding(category)
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src, cat, src_mask)
-        print('d_model: ', self.d_model)
-        print('output size: ', output.size())
         output = self.decoder(output) # This is what's different in this model.
         return output
     
