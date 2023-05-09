@@ -167,6 +167,9 @@ def train(model: nn.Module,
             model.train()
 
             output = model(x, category, src_mask)
+            print('x size: ', x.size())
+            print('category size: ',category.size())
+            print('src_mask size: ',src_mask.size())
 
             loss = criterion(output.transpose(1, 2), y)
 
@@ -476,7 +479,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, books_dataset, batch_size, sequence_length, num_epochs, ntokens_books, lr, type=1)
+        train(model, books_dataset, batch_size, sequence_length, num_epochs, ntokens_books, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books+"_"+str(lr)+".pt"
 
@@ -501,7 +504,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=1)
+        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_reviews+"_"+str(lr)+".pt"
 
@@ -526,7 +529,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=1)
+        train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_scripts+"_"+str(lr)+".pt"
 
@@ -558,7 +561,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3_2.TransformerModel_with_Category_edited(ntokens_books, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, books_dataset, batch_size, sequence_length, num_epochs, ntokens_books, lr, type=1)
+        train(model, books_dataset, batch_size, sequence_length, num_epochs, ntokens_books, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_2_"+tag_type_books+"_"+str(lr)+".pt"
 
@@ -583,7 +586,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3_2.TransformerModel_with_Category_edited(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=1)
+        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_2_"+tag_type_reviews+"_"+str(lr)+".pt"
 
@@ -608,7 +611,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3_2.TransformerModel_with_Category_edited(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=1)
+        train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_2_"+tag_type_scripts+"_"+str(lr)+".pt"
 
