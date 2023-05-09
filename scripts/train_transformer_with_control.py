@@ -17,7 +17,7 @@ import transformer_model_category_edited_3
 import transformer_model_category_edited_3_2
 import transformer_model_category_edited_4
 
-device = torch.device('cpu') # 'cuda' if torch.cuda.is_available() else 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') # 
 
 def find_files(path): return glob.glob(path)
 
@@ -167,9 +167,6 @@ def train(model: nn.Module,
         for batch, (x, y, category) in enumerate(dataloader):
             model.train()
 
-            print('x size: ', x.size())
-            print('category size: ',category.size())
-            print('src_mask size: ',src_mask.size())
             output = model(x, category, src_mask)
 
             loss = criterion(output.transpose(1, 2), y)
@@ -353,7 +350,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, books_dataset)
+        #predict_wrapper(model, books_dataset)
 
         run.finish()
         
@@ -378,7 +375,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, reviews_dataset)
+        #predict_wrapper(model, reviews_dataset)
 
         run.finish()
         
@@ -403,7 +400,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, scripts_dataset)
+        #predict_wrapper(model, scripts_dataset)
 
         run.finish()
 
@@ -487,7 +484,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, books_dataset)
+        #predict_wrapper(model, books_dataset)
 
         run.finish()
         
@@ -512,7 +509,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, reviews_dataset)
+        #predict_wrapper(model, reviews_dataset)
 
         run.finish()
         
@@ -537,7 +534,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, scripts_dataset)
+        #predict_wrapper(model, scripts_dataset)
 
         run.finish()
 
@@ -569,7 +566,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, books_dataset)
+        #predict_wrapper(model, books_dataset)
 
         run.finish()
         
@@ -594,7 +591,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, reviews_dataset)
+        #predict_wrapper(model, reviews_dataset)
 
         run.finish()
         
@@ -619,7 +616,7 @@ def train_wrapper():
 
         torch.save(model.state_dict(), file_path)
 
-        predict_wrapper(model, scripts_dataset)
+        #predict_wrapper(model, scripts_dataset)
 
         run.finish()
 
