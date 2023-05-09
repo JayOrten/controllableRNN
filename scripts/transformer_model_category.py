@@ -41,6 +41,8 @@ class TransformerModel_with_Category(nn.Module):
         cat = self.category_embedding(category)
         combined = torch.cat((cat, src), dim=1)
         src = self.pos_encoder(combined)
+        print('src size: ', src.size())
+        print('src mask size: ', src_mask.size())
         output = self.transformer_encoder(src, src_mask)
         output = self.decoder(output)
         return output[:, 1:, :]
