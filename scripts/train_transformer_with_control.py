@@ -315,6 +315,7 @@ def train_wrapper():
 
     ntokens_books = books_dataset.uniq_words  # size of vocabulary
     ntokens_reviews = reviews_dataset.uniq_words  # size of vocabulary
+    print('ntokens_reviews: ', ntokens_reviews)
     ntokens_scripts = scripts_dataset.uniq_words  # size of vocabulary
     emsize = 200  # embedding dimension
     d_hid = 200  # dimension of the feedforward network model in nn.TransformerEncoder
