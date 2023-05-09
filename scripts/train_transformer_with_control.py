@@ -17,7 +17,7 @@ import transformer_model_category_edited_3
 import transformer_model_category_edited_3_2
 import transformer_model_category_edited_4
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu') # 'cuda' if torch.cuda.is_available() else 
 
 def find_files(path): return glob.glob(path)
 
