@@ -142,7 +142,6 @@ def train(model: nn.Module,
           ntokens: int,
           lr: float,
           type=0) -> None:
-    print('REACHED')
     model.train()  # turn on train mode
     dataloader = DataLoader(dataset, batch_size=batch_size, drop_last=True)
     criterion = nn.CrossEntropyLoss()
@@ -327,9 +326,9 @@ def train_wrapper():
     print('NORMAL')
     
     # for each learning rate
-    for lr in lrs:
+    """for lr in lrs:
 
-        """BOOKS"""
+        #BOOKS
 
         run = wandb.init(name='normal',
                         project='controllable_transformer',
@@ -354,7 +353,7 @@ def train_wrapper():
 
         run.finish()
         
-        """REVIEWS"""
+        #REVIEWS
 
         run = wandb.init(name='normal',
                         project='controllable_transformer',
@@ -379,7 +378,7 @@ def train_wrapper():
 
         run.finish()
         
-        """SCRIPTS"""
+        # SCRIPTS
 
         run = wandb.init(name='normal',
                         project='controllable_transformer',
@@ -402,7 +401,7 @@ def train_wrapper():
 
         #predict_wrapper(model, scripts_dataset)
 
-        run.finish()
+        run.finish()"""
 
     """# Edited 1
     print('---------------------')
@@ -461,9 +460,9 @@ def train_wrapper():
     print('EDITED 3')
 
     # for each learning rate
-    for lr in lrs:
+    """for lr in lrs:
 
-        """BOOKS"""
+        #BOOKS
 
         run = wandb.init(name='edited_3',
                         project='controllable_transformer',
@@ -488,7 +487,7 @@ def train_wrapper():
 
         run.finish()
         
-        """REVIEWS"""
+        #REVIEWS
 
         run = wandb.init(name='edited_3',
                         project='controllable_transformer',
@@ -513,7 +512,7 @@ def train_wrapper():
 
         run.finish()
         
-        """SCRIPTS"""
+        #SCRIPTS
 
         run = wandb.init(name='edited_3',
                         project='controllable_transformer',
@@ -536,7 +535,7 @@ def train_wrapper():
 
         #predict_wrapper(model, scripts_dataset)
 
-        run.finish()
+        run.finish()"""
 
     # Edited 3.2
     print('---------------------')

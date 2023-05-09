@@ -21,7 +21,7 @@ class TransformerModel_with_Category_edited(nn.Module):
         self.encoder = nn.Embedding(ntoken, d_model)
         self.category_embedding = nn.Embedding(6, d_model)
         self.d_model = d_model
-        self.decoder = nn.Linear(d_model*2, ntoken)
+        self.decoder = nn.Linear(d_model, ntoken)
 
         self.init_weights()
 
@@ -44,6 +44,8 @@ class TransformerModel_with_Category_edited(nn.Module):
         cat = self.category_embedding(category)
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src, cat, src_mask)
+        print('d_model: ', self.d_model)
+        print('output size: ', output.size())
         output = self.decoder(output) # This is what's different in this model.
         return output
     
