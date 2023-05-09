@@ -38,7 +38,6 @@ class TransformerModel_with_Category(nn.Module):
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
         src = self.encoder(src) * math.sqrt(self.d_model)
-        print('category tensor: ', category)
         cat = self.category_embedding(category)
         combined = torch.cat((cat, src), dim=1)
         src = self.pos_encoder(combined)

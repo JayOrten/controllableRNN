@@ -320,7 +320,7 @@ def train_wrapper():
     nhead = 2  # number of heads in nn.MultiheadAttention
     dropout = 0.2  # dropout probability
     lrs = [0.0001, 0.001, 0.01]  # learning rates
-    num_epochs = 5
+    num_epochs = 1
     
     # Normal
     print('---------------------')
