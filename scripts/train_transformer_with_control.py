@@ -331,6 +331,31 @@ def train_wrapper():
     # for each learning rate
     for lr in lrs:
 
+        """REVIEWS"""
+
+        run = wandb.init(name='normal',
+                        project='controllable_transformer',
+                        config={
+                            'dataset':tag_type_reviews,
+                            'epochs':num_epochs,
+                            'hidden_size':d_hid,
+                            'learning rate':lr
+                        },
+                        reinit=True
+                        )
+        
+        model = transformer_model_category.TransformerModel_with_Category(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=1)
+
+        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_reviews+"_"+str(lr)+".pt"
+
+        torch.save(model.state_dict(), file_path)
+
+        predict_wrapper(model, reviews_dataset)
+
+        run.finish()
+
         """BOOKS"""
 
         run = wandb.init(name='normal',
@@ -356,30 +381,7 @@ def train_wrapper():
 
         run.finish()
         
-        """REVIEWS"""
-
-        run = wandb.init(name='normal',
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_reviews,
-                            'epochs':num_epochs,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
         
-        model = transformer_model_category.TransformerModel_with_Category(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
-
-        train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=1)
-
-        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_reviews+"_"+str(lr)+".pt"
-
-        torch.save(model.state_dict(), file_path)
-
-        predict_wrapper(model, reviews_dataset)
-
-        run.finish()
         
         """SCRIPTS"""
 
