@@ -318,7 +318,7 @@ def train_wrapper():
     nlayers = 4  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
     nhead = 2  # number of heads in nn.MultiheadAttention
     dropout = 0.2  # dropout probability
-    lrs = [0.0001, 0.001, 0.01]  # learning rates
+    lrs = [5.0]  # learning rates
     #num_epochs = 1
     
     # Normal
@@ -330,7 +330,7 @@ def train_wrapper():
 
         #BOOKS
 
-        run = wandb.init(name='normal',
+        run = wandb.init(name='normal_books',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_books,
@@ -355,11 +355,11 @@ def train_wrapper():
         
         #REVIEWS
 
-        run = wandb.init(name='normal',
+        run = wandb.init(name='normal_reviews',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_reviews,
-                            'epochs':10,
+                            'epochs':50,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -368,7 +368,7 @@ def train_wrapper():
         
         model = transformer_model_category.TransformerModel_with_Category(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, reviews_dataset, batch_size, sequence_length, 10, ntokens_reviews, lr, type=1)
+        train(model, reviews_dataset, batch_size, sequence_length, 50, ntokens_reviews, lr, type=1)
 
         file_path = f"./trained_models/transformer_trained_normal_"+tag_type_reviews+"_"+str(lr)+".pt"
 
@@ -380,7 +380,7 @@ def train_wrapper():
         
         # SCRIPTS
 
-        run = wandb.init(name='normal',
+        run = wandb.init(name='normal_scripts',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_scripts,
@@ -464,7 +464,7 @@ def train_wrapper():
 
         #BOOKS
 
-        run = wandb.init(name='edited_3',
+        run = wandb.init(name='edited_3_books',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_books,
@@ -489,11 +489,11 @@ def train_wrapper():
         
         #REVIEWS
 
-        run = wandb.init(name='edited_3',
+        run = wandb.init(name='edited_3_reviews',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_reviews,
-                            'epochs':10,
+                            'epochs':50,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -502,7 +502,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, reviews_dataset, batch_size, sequence_length, 10, ntokens_reviews, lr, type=0)
+        train(model, reviews_dataset, batch_size, sequence_length, 50, ntokens_reviews, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_reviews+"_"+str(lr)+".pt"
 
@@ -514,7 +514,7 @@ def train_wrapper():
         
         #SCRIPTS
 
-        run = wandb.init(name='edited_3',
+        run = wandb.init(name='edited_3_scripts',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_scripts,
@@ -546,7 +546,7 @@ def train_wrapper():
 
         """BOOKS"""
 
-        run = wandb.init(name='edited_3_2',
+        run = wandb.init(name='edited_3_2_books',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_books,
@@ -571,11 +571,11 @@ def train_wrapper():
         
         """REVIEWS"""
 
-        run = wandb.init(name='edited_3_2',
+        run = wandb.init(name='edited_3_2_reviews',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_reviews,
-                            'epochs':10,
+                            'epochs':50,
                             'hidden_size':d_hid,
                             'learning rate':lr
                         },
@@ -584,7 +584,7 @@ def train_wrapper():
         
         model = transformer_model_category_edited_3_2.TransformerModel_with_Category_edited(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, reviews_dataset, batch_size, sequence_length, 10, ntokens_reviews, lr, type=0)
+        train(model, reviews_dataset, batch_size, sequence_length, 50, ntokens_reviews, lr, type=0)
 
         file_path = f"./trained_models/transformer_trained_edited_3_2_"+tag_type_reviews+"_"+str(lr)+".pt"
 
@@ -596,7 +596,7 @@ def train_wrapper():
         
         """SCRIPTS"""
 
-        run = wandb.init(name='edited_3_2',
+        run = wandb.init(name='edited_3_2_scripts',
                         project='controllable_transformer',
                         config={
                             'dataset':tag_type_scripts,
