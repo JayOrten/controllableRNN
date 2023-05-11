@@ -33,7 +33,7 @@ def build_vocabulary_from_file(spacy_en, filename: str, lowercase=True):
     vocab = build_vocab_from_iterator(
         yield_tokens(train, tokenize_en),
         min_freq=1,
-        specials=["<greatgatsby>", "<shakespeare>", "<garden>", "<music>", "<news>", "<blog>", "<s>", "</s>", "<blank>", "<unk>"],
+        specials=["<greatgatsby>", "<shakespeare>", "<twocities>", "<garden>", "<music>", "<news>", "<blog>", "<s>", "</s>", "<blank>", "<unk>"],
     )
 
     vocab.set_default_index(vocab["<unk>"])
@@ -93,6 +93,7 @@ def load_spacy():
     nlp = spacy.load("en_core_web_sm")
     nlp.tokenizer.add_special_case("<shakespeare>", [{"ORTH": "<shakespeare>"}])
     nlp.tokenizer.add_special_case("<greatgatsby>", [{"ORTH": "<greatgatsby>"}])
+    nlp.tokenizer.add_special_case("<twocities>", [{"ORTH": "<twocities>"}])
     nlp.tokenizer.add_special_case("<garden>", [{"ORTH": "<garden>"}])
     nlp.tokenizer.add_special_case("<music>", [{"ORTH": "<music>"}])
     nlp.tokenizer.add_special_case("<news>", [{"ORTH": "<news>"}])
