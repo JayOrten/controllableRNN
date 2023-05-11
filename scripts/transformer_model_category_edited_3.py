@@ -19,7 +19,7 @@ class TransformerModel_with_Category_edited(nn.Module):
         encoder_layers = TransformerEncoderLayer_edited(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = TransformerEncoder_edited(encoder_layers, nlayers)
         self.encoder = nn.Embedding(ntoken, d_model)
-        self.category_embedding = nn.Embedding(6, d_model)
+        self.category_embedding = nn.Embedding(7, d_model)
         self.d_model = d_model
         self.decoder = nn.Linear(d_model*2, ntoken)
 

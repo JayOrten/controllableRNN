@@ -16,7 +16,7 @@ class TransformerModel_with_Category(nn.Module):
         encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.encoder = nn.Embedding(ntoken, d_model)
-        self.category_embedding = nn.Embedding(6, d_model) # the first value is the total number of categories the vocab is expecting
+        self.category_embedding = nn.Embedding(7, d_model) # the first value is the total number of categories the vocab is expecting
         self.d_model = d_model
         self.decoder = nn.Linear(d_model, ntoken)
 
