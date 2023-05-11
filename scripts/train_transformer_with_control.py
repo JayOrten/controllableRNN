@@ -319,7 +319,7 @@ def train_wrapper():
     ntokens_scripts = scripts_dataset.uniq_words  # size of vocabulary
     ntokens_books_2 = books_2_dataset.uniq_words  # size of vocabulary
     emsize = 200  # embedding dimension
-    d_hids = [256, 512, 1024]  # dimension of the feedforward network model in nn.TransformerEncoder
+    d_hids = [200]  # dimension of the feedforward network model in nn.TransformerEncoder
     nlayers = 4  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
     nhead = 2  # number of heads in nn.MultiheadAttention
     dropout = 0.2  # dropout probability
