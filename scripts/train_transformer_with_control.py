@@ -8,16 +8,22 @@ from typing import Tuple
 import time
 import math
 import wandb
+from sacrebleu.metrics import BLEU
+import nltk
+from nltk import tokenize
+from bert_score import BERTScorer
 
 import build_vocab
 import transformer_model_category
-import transformer_model_category_edited_1
-import transformer_model_category_edited_2
+#import transformer_model_category_edited_1
+#import transformer_model_category_edited_2
 import transformer_model_category_edited_3
-import transformer_model_category_edited_3_2
-import transformer_model_category_edited_4
+#import transformer_model_category_edited_3_2
+#import transformer_model_category_edited_4
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') # 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') 
+
+nltk.download('punkt') # tokenizer used for evaluation metrics
 
 def find_files(path): return glob.glob(path)
 
@@ -28,8 +34,8 @@ class Transformer_Dataset(torch.utils.data.Dataset):
         batch_size,
         tag_type
     ):
-        folder = "../vocabs_and_tokens/" + tag_type + "/"
-        data_folder = "../data/" + tag_type + "/"
+        folder = "..\\vocabs_and_tokens\\" + tag_type + "\\"
+        data_folder = "..\\data\\" + tag_type + "\\"
         vocab_file = folder + "*.pt"
         token_files = folder + "*.pkl"
         self.sequence_length = sequence_length
@@ -43,11 +49,18 @@ class Transformer_Dataset(torch.utils.data.Dataset):
 
     # data_folder needs to be like '../data/reviews/'
     def setup_categories(self, data_folder):
+
+        self.raw_text = {} # used for metrics like BLEU. Dict of category -> [sentences in data]
         all_categories = []
         for filename in find_files(data_folder + '*.txt'):
             category = os.path.splitext(os.path.basename(filename))[0]
             all_categories.append(category)
-            
+
+            with open(filename, mode="r", encoding="utf-8") as txt_file:
+                contents = txt_file.read()
+                sentences = tokenize.sent_tokenize(contents) # Tokenizes into sentences
+                self.raw_text[category] = sentences
+        
         n_categories = len(all_categories)
 
         if n_categories == 0:
@@ -67,7 +80,7 @@ class Transformer_Dataset(torch.utils.data.Dataset):
         self.train_tokens = []
         self.train_num_sequences = []
 
-        self.eval_tokens = []
+        self.eval_tokens = [] # List of lists, corresponding to tokens from each dataset
         self.eval_num_sequences = []
 
         for token_file in token_files:
@@ -149,8 +162,9 @@ def train(model: nn.Module,
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
     
     total_loss = 0.
-    log_interval = dataset.num_batches-1
+    log_interval = dataset.num_batches-1 # Logging every epoch
     start_time = time.time()
+    text_table = wandb.Table(columns=["epoch", "category", "generation"])
 
     # Simple switch to deal with concatenation types for testing
     if type == 0:
@@ -161,8 +175,6 @@ def train(model: nn.Module,
     num_batches = dataset.num_batches
 
     for epoch in range(num_epochs):
-
-        #for batch, i in enumerate(range(0, train_data.size(0) - 1, bptt)):
         for batch, (x, y, category) in enumerate(dataloader):
             model.train()
 
@@ -196,7 +208,11 @@ def train(model: nn.Module,
                 print('EVAL LOSS: ', eval_loss)
                 wandb.log({"eval_loss":eval_loss})
 
+                predict_wrapper(model, dataset, epoch, text_table)
+
         scheduler.step()
+
+    wandb.log({"training_samples" : text_table})
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
     """Generates an upper-triangular matrix of -inf, with zeros on diag."""
@@ -212,6 +228,7 @@ def evaluate(model: nn.Module, dataset, src_mask) -> float:
 
     total_loss = 0.
 
+    # Run through test data and calulcate evaluation loss
     with torch.no_grad():
         for index in range(0, sum(eval_num_sequences)):
 
@@ -224,9 +241,11 @@ def evaluate(model: nn.Module, dataset, src_mask) -> float:
 
             string_category= dataset.all_categories[category_index]
             category, category_index = dataset.category_tensor(string_category)
-
+            
             # Pick the right token samples based on the category
             current_sample = eval_tokens[category_index]
+
+            sequence_index = sequence_index * dataset.sequence_length
                 
             end_index = sequence_index + dataset.sequence_length
             
@@ -236,7 +255,128 @@ def evaluate(model: nn.Module, dataset, src_mask) -> float:
             output = model(data, category.unsqueeze(0), src_mask)
             output_flat = output.transpose(1, 2)
             total_loss += criterion(output_flat, targets).item()
-    return total_loss / (sum(eval_num_sequences) - 1)
+
+    evaluation_loss = total_loss / (sum(eval_num_sequences) - 1)
+
+    # Calculate BLEU score on an arbitrary set of 20 samples
+    # Here we are getting a prediction and using the entire eval set as reference. We average of the ten samples.
+    num_samples = 20
+    sum_score = 0
+    for _ in range(num_samples):
+        # Pick random category
+        category = random.choice(dataset.all_categories)
+
+        # Get all sentences of data
+        data = dataset.raw_text[category]
+
+        # Get prediction
+        input = "i"
+        prediction = ' '.join(predict(model, input, category, dataset, generation_length=15))
+
+        bleu = BLEU()
+
+        bleu_score = bleu.corpus_score(prediction, data)
+
+        sum_score += bleu_score.score
+
+    # Average score of generations
+    final_bleu_score = sum_score / num_samples
+
+    # Record in WandB
+    wandb.log({"bleu_score_corpus":final_bleu_score})
+
+    # Here we are going through each sentence in corpus and generating a result based on half of the sentence.
+    # Then, we do a corpus wide bleu score calculation on all generation. Seems like this should take a lot longer...
+    # this doesn't work, it just takes way too long
+    """references = []
+    predictions = []
+    # For each sentence in corpus
+    for category in dataset.all_categories:
+        for sentence in dataset.raw_text[category]:
+            print('sentence: ', sentence)
+            # Get length of sentence
+            sentence_length = len(sentence.split())
+            #print('sentence_length: ', sentence_length)
+
+            # Get first half of sentence
+            # If the sentence length < 2, just skip??
+            if sentence_length >= 2:
+                sentence_half = ' '.join(sentence.split()[:sentence_length//2])
+                generation_length = sentence_length//2
+            else:
+                sentence_half = sentence
+                generation_length = 1
+            #print('sentence_half: ', sentence_half)
+
+            # Generate prediction on the rest, up to the proper length
+            prediction = ' '.join(predict(model, sentence_half.lower(), category, dataset, generation_length=generation_length))
+            print('prediction: ', prediction)
+
+            # Add full sentences for both reference and prediction to arrays
+            references.append(sentence)
+            predictions.append(prediction)
+    
+    # Compute full bleu score for all.
+    bleu = BLEU()
+
+    bleu_score = bleu.corpus_score(predictions, [references])
+    print('bleu score: ', bleu_score)"""
+
+    # Instead we do halfway prediction on a sample of 20 sentences or so from the set
+    scorer = BERTScorer(lang="en", rescale_with_baseline=True)
+
+    references = []
+    predictions = []
+
+    num_samples = 20
+    for _ in range(num_samples):
+        # Pick random category
+        category = random.choice(dataset.all_categories)
+
+        # Get all sentences of data
+        data = dataset.raw_text[category]
+
+        # Get random sentence
+        sentence = data[random.randint(0, len(data)-1)]
+
+        # Get length of sentence
+        sentence_length = len(sentence.split())
+
+        # Get first half of sentence
+        # If the sentence length < 2, just use the word
+        if sentence_length >= 2:
+            sentence_half = ' '.join(sentence.split()[:sentence_length//2])
+            generation_length = sentence_length//2
+        else:
+            sentence_half = sentence
+            generation_length = 1
+
+        # Generate prediction on the rest, up to the proper length
+        prediction = ' '.join(predict(model, sentence_half.lower(), category, dataset, generation_length=generation_length))
+        
+        # Add full sentences for both reference and prediction to arrays
+        references.append(sentence)
+        predictions.append(prediction)
+
+    bleu = BLEU()
+
+    bleu_score = bleu.corpus_score(predictions, [references])
+
+    # Record in WandB
+    wandb.log({"bleu_score":bleu_score.score})
+
+    # BERTScore
+    P, R, F1 = scorer.score(predictions, references)
+    print('p: ', P)
+    print('R: ', R)
+    print('F1: ', F1)
+    print(f"System level F1 score: {F1.mean()}")
+
+    wandb.log({"system_level_f1_BERT":F1.mean()})
+
+    #CTRLEval?
+
+    return evaluation_loss
 
 def predict(model: nn.Module, input: str, category: str, dataset, generation_length=100):
 
@@ -268,31 +408,27 @@ def predict(model: nn.Module, input: str, category: str, dataset, generation_len
 
     return final_prediction
 
-def predict_wrapper(model, dataset):
+def predict_wrapper(model, dataset, epoch, text_table = None):
 
-    input = 'in my younger and more vulnerable years' 
-    category = 'greatgatsby'
-    prediction = predict(model, input, category, dataset)
+    categories = dataset.all_categories
 
-    print(' '.join(prediction))
+    for category in categories:
+        #print('category: ', category)
 
-    input = 'from fairest creatures' 
-    category = 'shakespeare'
-    prediction = predict(model, input, category, dataset)
+        input = 'i' 
+        prediction = predict(model, input, category, dataset)
 
-    print(' '.join(prediction))
+        #print(' '.join(prediction))
 
-    input = 'tom was evidently perturbed at daisy’s running' 
-    category = 'greatgatsby'
-    prediction = predict(model, input, category, dataset)
+        with open('predictions.txt', 'a') as file:
+            file.write('\n')
+            file.write('Category: ')
+            file.write(category)
+            file.write('Prediction: ')
+            file.write(' '.join(prediction))
 
-    print(' '.join(prediction))
-
-    input = 'in faith i do not love' 
-    category = 'shakespeare'
-    prediction = predict(model, input, category, dataset)
-
-    print(' '.join(prediction))
+        if text_table:
+            text_table.add_data(epoch, category, ' '.join(prediction))
 
 
 # This is a way to perform multiple runs in the same script.
@@ -302,8 +438,14 @@ def train_wrapper():
     sequence_length = 256 # Length of one sequence
     batch_size = 16 # Number of sequences in a batch
 
-    tag_type_books = 'books'
-    books_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books)
+    tag_type_books_2_sources = 'books_2_sources'
+    books_2_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_2_sources)
+
+    tag_type_books_3_sources = 'books_3_sources'
+    books_3_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_3_sources)
+
+    tag_type_books_6_sources = 'books_6_sources'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_6_sources)
 
     tag_type_reviews = 'reviews'
     reviews_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_reviews)
@@ -311,20 +453,20 @@ def train_wrapper():
     tag_type_scripts = 'scripts'
     scripts_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_scripts)
 
-    tag_type_books_2 = 'books2'
-    books_2_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_2)
-
-    ntokens_books = books_dataset.uniq_words  # size of vocabulary
+    ntokens_books_2 = books_2_dataset.uniq_words  # size of vocabulary
+    ntokens_books_3 = books_3_dataset.uniq_words  # size of vocabulary
+    ntokens_books_6 = books_6_dataset.uniq_words  # size of vocabulary
     ntokens_reviews = reviews_dataset.uniq_words  # size of vocabulary
     ntokens_scripts = scripts_dataset.uniq_words  # size of vocabulary
-    ntokens_books_2 = books_2_dataset.uniq_words  # size of vocabulary
+
     emsize = 200  # embedding dimension
-    d_hids = [200]  # dimension of the feedforward network model in nn.TransformerEncoder
-    nlayers = 4  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+    d_hids = [128,256,512,1024]  # dimension of the feedforward network model in nn.TransformerEncoder
+    nlayerss = [2,4,6,8]  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
     nhead = 2  # number of heads in nn.MultiheadAttention
     dropout = 0.2  # dropout probability
     lr = 5.0  # learning rates
-    #num_epochs = 1
+    num_epochs = 2
+    project_name = "transformer_test"
     
     # Normal
     print('---------------------')
@@ -332,158 +474,126 @@ def train_wrapper():
     
     # for each learning rate
     for d_hid in d_hids:
+        for nlayers in nlayerss:
 
-        #BOOKS
+            #BOOKS 2 SOURCES
+            run = wandb.init(name='normal_books_2_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_2_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category.TransformerModel_with_Category(ntokens_books_2, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        run = wandb.init(name='normal_books_'+str(d_hid),
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_books,
-                            'epochs':100,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
-        
-        model = transformer_model_category.TransformerModel_with_Category(ntokens_books, emsize, nhead, d_hid, nlayers, dropout).to(device)
+            train(model, books_2_dataset, batch_size, sequence_length, num_epochs, ntokens_books_2, lr, type=1)
 
-        train(model, books_dataset, batch_size, sequence_length, 100, ntokens_books, lr, type=1)
+            file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books_2_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books+"_"+str(d_hid)+".pt"
+            torch.save(model.state_dict(), file_path)
 
-        torch.save(model.state_dict(), file_path)
+            run.finish()
+            
+            #BOOKS 3 SOURCES
 
-        #predict_wrapper(model, books_dataset)
+            run = wandb.init(name='normal_books_3_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_3_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category.TransformerModel_with_Category(ntokens_books_3, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        run.finish()
-        
-        #REVIEWS
+            train(model, books_3_dataset, batch_size, sequence_length, num_epochs, ntokens_books_3, lr, type=1)
 
-        run = wandb.init(name='normal_reviews_'+str(d_hid),
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_reviews,
-                            'epochs':50,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
-        
-        model = transformer_model_category.TransformerModel_with_Category(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
+            file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books_3_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        train(model, reviews_dataset, batch_size, sequence_length, 50, ntokens_reviews, lr, type=1)
+            torch.save(model.state_dict(), file_path)
 
-        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_reviews+"_"+str(d_hid)+".pt"
+            run.finish()
 
-        torch.save(model.state_dict(), file_path)
+            #BOOKS 6 SOURCES 
 
-        #predict_wrapper(model, reviews_dataset)
+            run = wandb.init(name='normal_books_6_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_6_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category.TransformerModel_with_Category(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        run.finish()
-        
-        # SCRIPTS
+            train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=1)
 
-        run = wandb.init(name='normal_scripts_'+str(d_hid),
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_scripts,
-                            'epochs':100,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
-        
-        model = transformer_model_category.TransformerModel_with_Category(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
+            file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books_6_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        train(model, scripts_dataset, batch_size, sequence_length, 100, ntokens_scripts, lr, type=1)
+            torch.save(model.state_dict(), file_path)
 
-        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_scripts+"_"+str(d_hid)+".pt"
+            run.finish()
 
-        torch.save(model.state_dict(), file_path)
+            #REVIEWS
 
-        #predict_wrapper(model, scripts_dataset)
+            run = wandb.init(name='normal_reviews_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_reviews,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category.TransformerModel_with_Category(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        run.finish()
+            train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=1)
 
-        #BOOKS2
+            file_path = f"./trained_models/transformer_trained_normal_"+tag_type_reviews+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        run = wandb.init(name='normal_books_2_'+str(d_hid),
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_books_2,
-                            'epochs':250,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
-        
-        model = transformer_model_category.TransformerModel_with_Category(ntokens_books_2, emsize, nhead, d_hid, nlayers, dropout).to(device)
+            torch.save(model.state_dict(), file_path)
 
-        train(model, books_2_dataset, batch_size, sequence_length, 250, ntokens_books_2, lr, type=1)
+            run.finish()
+            
+            # SCRIPTS
 
-        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books_2+"_"+str(d_hid)+".pt"
+            run = wandb.init(name='normal_scripts_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_scripts,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category.TransformerModel_with_Category(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        torch.save(model.state_dict(), file_path)
+            train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=1)
 
-        #predict_wrapper(model, books_dataset)
+            file_path = f"./trained_models/transformer_trained_normal_"+tag_type_scripts+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        run.finish()
+            torch.save(model.state_dict(), file_path)
 
-    """# Edited 1
-    print('---------------------')
-    print('EDITED 1')
-
-    run = wandb.init(name='edited_1',
-                     project='controllable_transformer',
-                     config={
-                        'dataset':tag_type,
-                        'epochs':num_epochs,
-                        'hidden_size':d_hid
-                     },
-                    reinit=True
-                     )
-    
-    model = transformer_model_category_edited_1.TransformerModel_with_Category_edited(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
-
-    train(model, dataset, batch_size, sequence_length, num_epochs, ntokens, lr, type=0)
-
-    file_path = f"./trained_models/transformer_trained_edited1.pt"
-
-    torch.save(model.state_dict(), file_path)
-
-    predict_wrapper(model, dataset)
-
-    run.finish()
-
-    # Edited 2
-    print('---------------------')
-    print('EDITED 2')
-
-    run = wandb.init(name='edited_2',
-                     project='controllable_transformer',
-                     config={
-                        'dataset':tag_type,
-                        'epochs':num_epochs,
-                        'hidden_size':d_hid
-                     },
-                    reinit=True
-                     )
-    
-    model = transformer_model_category_edited_2.TransformerModel_with_Category_edited(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
-
-    train(model, dataset, batch_size, sequence_length, num_epochs, ntokens, lr, type=0)
-
-    file_path = f"./trained_models/transformer_trained_edited2.pt"
-
-    torch.save(model.state_dict(), file_path)
-
-    predict_wrapper(model, dataset)
-
-    run.finish()"""
+            run.finish()
 
     # Edited 3
     print('---------------------')
@@ -491,132 +601,127 @@ def train_wrapper():
 
     # for each learning rate
     for d_hid in d_hids:
+        for nlayers in nlayerss:
 
-        #BOOKS
+            #BOOKS 2 SOURCES
 
-        run = wandb.init(name='edited_3_books_'+str(d_hid),
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_books,
-                            'epochs':100,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
-        
-        model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books, emsize, nhead, d_hid, nlayers, dropout).to(device)
+            run = wandb.init(name='edited_3_books_2_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_2_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_2, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        train(model, books_dataset, batch_size, sequence_length, 100, ntokens_books, lr, type=0)
+            train(model, books_2_dataset, batch_size, sequence_length, num_epochs, ntokens_books_2, lr, type=0)
 
-        file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books+"_"+str(d_hid)+".pt"
+            file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books_2_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        torch.save(model.state_dict(), file_path)
+            torch.save(model.state_dict(), file_path)
 
-        #predict_wrapper(model, books_dataset)
+            run.finish()
+            
+            #BOOKS 3 SOURCES
 
-        run.finish()
-        
-        #REVIEWS
+            run = wandb.init(name='edited_3_books_3_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_3_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_3, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        run = wandb.init(name='edited_3_reviews_'+str(d_hid),
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_reviews,
-                            'epochs':50,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
-        
-        model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
+            train(model, books_3_dataset, batch_size, sequence_length, num_epochs, ntokens_books_3, lr, type=0)
 
-        train(model, reviews_dataset, batch_size, sequence_length, 50, ntokens_reviews, lr, type=0)
+            file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books_3_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_reviews+"_"+str(d_hid)+".pt"
+            torch.save(model.state_dict(), file_path)
 
-        torch.save(model.state_dict(), file_path)
+            run.finish()
 
-        #predict_wrapper(model, reviews_dataset)
+            #BOOKS 6 SOURCES
 
-        run.finish()
-        
-        #SCRIPTS
+            run = wandb.init(name='edited_3_books_6_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_6_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        run = wandb.init(name='edited_3_scripts_'+str(d_hid),
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_scripts,
-                            'epochs':100,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
-        
-        model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
+            train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=0)
 
-        train(model, scripts_dataset, batch_size, sequence_length, 100, ntokens_scripts, lr, type=0)
+            file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books_6_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_scripts+"_"+str(d_hid)+".pt"
+            torch.save(model.state_dict(), file_path)
 
-        torch.save(model.state_dict(), file_path)
+            run.finish()
 
-        #predict_wrapper(model, scripts_dataset)
+            #REVIEWS
 
-        run.finish()
+            run = wandb.init(name='edited_3_reviews_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_reviews,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_reviews, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        #BOOKS2
+            train(model, reviews_dataset, batch_size, sequence_length, num_epochs, ntokens_reviews, lr, type=0)
 
-        run = wandb.init(name='edited_books_2_'+str(d_hid),
-                        project='controllable_transformer',
-                        config={
-                            'dataset':tag_type_books_2,
-                            'epochs':250,
-                            'hidden_size':d_hid,
-                            'learning rate':lr
-                        },
-                        reinit=True
-                        )
-        
-        model = transformer_model_category.TransformerModel_with_Category(ntokens_books_2, emsize, nhead, d_hid, nlayers, dropout).to(device)
+            file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_reviews+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-        train(model, books_2_dataset, batch_size, sequence_length, 250, ntokens_books_2, lr, type=1)
+            torch.save(model.state_dict(), file_path)
 
-        file_path = f"./trained_models/transformer_edited_normal_"+tag_type_books_2+"_"+str(d_hid)+".pt"
+            run.finish()
+            
+            #SCRIPTS
 
-        torch.save(model.state_dict(), file_path)
+            run = wandb.init(name='edited_3_scripts_'+str(d_hid)+'_'+str(nlayers),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_scripts,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+            
+            model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_scripts, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-        #predict_wrapper(model, books_dataset)
+            train(model, scripts_dataset, batch_size, sequence_length, num_epochs, ntokens_scripts, lr, type=0)
 
-        run.finish()
+            file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_scripts+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
 
-    """# Edited 4
-    print('---------------------')
-    print('EDITED 4')
+            torch.save(model.state_dict(), file_path)
 
-    run = wandb.init(name='edited_4',
-                     project='controllable_transformer',
-                     config={
-                        'dataset':tag_type,
-                        'epochs':num_epochs,
-                        'hidden_size':d_hid
-                     },
-                    reinit=True
-                     )
-    
-    model = transformer_model_category_edited_4.TransformerModel_with_Category_edited(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
-
-    train(model, dataset, batch_size, sequence_length, num_epochs, ntokens, lr, type=0)
-
-    file_path = f"./trained_models/transformer_trained_edited4.pt"
-
-    torch.save(model.state_dict(), file_path)
-
-    predict_wrapper(model, dataset)
-
-    run.finish()"""
+            run.finish()
 
 
 def main():

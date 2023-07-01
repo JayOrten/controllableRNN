@@ -19,7 +19,7 @@ class TransformerModel_with_Category_edited(nn.Module):
         encoder_layers = TransformerEncoderLayer_edited(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = TransformerEncoder_edited(encoder_layers, nlayers)
         self.encoder = nn.Embedding(ntoken, d_model)
-        self.category_embedding = nn.Embedding(7, d_model)
+        self.category_embedding = nn.Embedding(10, d_model)
         self.d_model = d_model
         self.decoder = nn.Linear(d_model*2, ntoken)
 
@@ -192,15 +192,13 @@ class TransformerEncoderLayer_edited(nn.Module):
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model*2, dim_feedforward, **factory_kwargs)
         self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward*2, d_model, **factory_kwargs)
+        self.linear2 = nn.Linear(dim_feedforward+d_model, d_model, **factory_kwargs)
 
         self.norm_first = norm_first
         self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
         self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
-
-        self.final_linear = nn.Linear(d_model*2, d_model)
 
         # Legacy string support for activation function.
         if isinstance(activation, str):
@@ -327,9 +325,6 @@ class TransformerEncoderLayer_edited(nn.Module):
             x = self.norm1(x + self._sa_block(x, src_mask, src_key_padding_mask))
             x = self.norm2(x + self._ff_block(x, cat))
 
-        #print('x size: ', x.size())
-        #x = self.final_linear(x)
-
         return x
 
 
@@ -344,7 +339,7 @@ class TransformerEncoderLayer_edited(nn.Module):
 
     # feed forward block
     def _ff_block(self, x: Tensor, cat) -> Tensor:
-        x = torch.cat((x, cat.expand(x.size()[0], x.size()[1], 200)), dim=2)
+        x = torch.cat((x, cat.expand(x.size()[0], x.size()[1], 200)), dim=2) # What is 200??
         x = self.dropout(self.activation(self.linear1(x)))
         x = torch.cat((x, cat.expand(x.size()[0], x.size()[1], 200)), dim=2)
         x = self.linear2(x)

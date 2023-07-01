@@ -33,7 +33,20 @@ def build_vocabulary_from_file(spacy_en, filename: str, lowercase=True):
     vocab = build_vocab_from_iterator(
         yield_tokens(train, tokenize_en),
         min_freq=1,
-        specials=["<greatgatsby>", "<shakespeare>", "<twocities>", "<garden>", "<music>", "<news>", "<blog>", "<s>", "</s>", "<blank>", "<unk>"],
+        specials=["<greatgatsby>", 
+                  "<shakespeare>", 
+                  "<twocities>", 
+                  "<mobydick>",
+                  "<aliceinwonderland>",
+                  "<iliad>",
+                  "<garden>", 
+                  "<music>", 
+                  "<news>", 
+                  "<blog>", 
+                  "<s>", 
+                  "</s>", 
+                  "<blank>", 
+                  "<unk>"],
     )
 
     vocab.set_default_index(vocab["<unk>"])
@@ -94,6 +107,9 @@ def load_spacy():
     nlp.tokenizer.add_special_case("<shakespeare>", [{"ORTH": "<shakespeare>"}])
     nlp.tokenizer.add_special_case("<greatgatsby>", [{"ORTH": "<greatgatsby>"}])
     nlp.tokenizer.add_special_case("<twocities>", [{"ORTH": "<twocities>"}])
+    nlp.tokenizer.add_special_case("<mobydick>", [{"ORTH": "<mobydick>"}])
+    nlp.tokenizer.add_special_case("<aliceinwonderland>", [{"ORTH": "<aliceinwonderland>"}])
+    nlp.tokenizer.add_special_case("<iliad>", [{"ORTH": "<iliad>"}])
     nlp.tokenizer.add_special_case("<garden>", [{"ORTH": "<garden>"}])
     nlp.tokenizer.add_special_case("<music>", [{"ORTH": "<music>"}])
     nlp.tokenizer.add_special_case("<news>", [{"ORTH": "<news>"}])
@@ -113,24 +129,24 @@ def main():
                 contents = infile.read()
                 outfile.write(contents)
 
-    type = sys.argv[2].split('/')[2]
-    parent_dir = "../vocabs_and_tokens/" + type
+    type = sys.argv[2].split('\\')[2]
+    parent_dir = "..\\vocabs_and_tokens\\" + type
     if not os.path.isdir(parent_dir):
         os.mkdir(parent_dir)
 
     nlp = load_spacy()
     # In order to create the vocab, you have to combine all of the sources
-    vocab = build_and_save_vocab_from_file(nlp, "combined.txt", parent_dir + "/" + type + "_vocab.pt")
+    vocab = build_and_save_vocab_from_file(nlp, "combined.txt", parent_dir + "\\" + type + "_vocab.pt")
 
     specifiers = []
     # Get the token file tags:
     for i in range(1, n):
         filename = sys.argv[i]
-        specifiers.append((filename.split('/')[-1]).split('.')[0]) # extract the token file specifier name (category)
+        specifiers.append((filename.split('\\')[-1]).split('.')[0]) # extract the token file specifier name (category)
 
     for i in range(1, n):
         filename = sys.argv[i]
-        output_file = parent_dir + "/" + specifiers[i-1] + "_tok.pkl"
+        output_file = parent_dir + "\\" + specifiers[i-1] + "_tok.pkl"
         generate_tokenized_file(vocab, nlp, filename, output_file, lowercase=True)
 
     # Remove combined
