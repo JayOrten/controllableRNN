@@ -42,6 +42,8 @@ class Transformer_Dataset(torch.utils.data.Dataset):
         self.batch_size = batch_size
         self.spacy = build_vocab.load_spacy()
 
+        self.vocab = build_vocab.load_vocab(find_files(vocab_file)[0])
+
         self.all_categories, self.n_categories = self.setup_categories(data_folder)
         self.load_words(vocab_file, token_files)
     
@@ -58,8 +60,9 @@ class Transformer_Dataset(torch.utils.data.Dataset):
 
             with open(filename, mode="r", encoding="utf-8") as txt_file:
                 contents = txt_file.read()
-                sentences = tokenize.sent_tokenize(contents) # Tokenizes into sentences
-                self.raw_text[category] = sentences
+                tokenized_contents = [tok.text for tok in self.spacy.tokenizer(contents)]
+                #words = tokenize.wordpunct_tokenize(contents) # Tokenizes into sentences
+                self.raw_text[category] = tokenized_contents
         
         n_categories = len(all_categories)
 
@@ -73,7 +76,7 @@ class Transformer_Dataset(torch.utils.data.Dataset):
     def load_words(self, vocab_file, token_files):
         # We want the vocab to be constructed from all sources, but we need the raw token sets for each seperately.
         # The category vector can just be a simple index vector.
-        self.vocab = build_vocab.load_vocab(find_files(vocab_file)[0])
+        #self.vocab = build_vocab.load_vocab(find_files(vocab_file)[0])
 
         token_files = find_files(token_files)
         
@@ -85,7 +88,7 @@ class Transformer_Dataset(torch.utils.data.Dataset):
 
         for token_file in token_files:
             raw_tokens = build_vocab.load_tokenized_file(token_file)
-            test_split = int(len(raw_tokens) * .90)
+            test_split = int(len(raw_tokens) * .95)
  
             train_token = raw_tokens[:test_split]
             eval_token = raw_tokens[test_split:]
@@ -258,109 +261,50 @@ def evaluate(model: nn.Module, dataset, src_mask) -> float:
 
     evaluation_loss = total_loss / (sum(eval_num_sequences) - 1)
 
-    # Calculate BLEU score on an arbitrary set of 20 samples
-    # Here we are getting a prediction and using the entire eval set as reference. We average of the ten samples.
-    num_samples = 20
-    sum_score = 0
-    for _ in range(num_samples):
-        # Pick random category
-        category = random.choice(dataset.all_categories)
-
-        # Get all sentences of data
-        data = dataset.raw_text[category]
-
-        # Get prediction
-        input = "i"
-        prediction = ' '.join(predict(model, input, category, dataset, generation_length=15))
-
-        bleu = BLEU()
-
-        bleu_score = bleu.corpus_score(prediction, data)
-
-        sum_score += bleu_score.score
-
-    # Average score of generations
-    final_bleu_score = sum_score / num_samples
-
-    # Record in WandB
-    wandb.log({"bleu_score_corpus":final_bleu_score})
-
-    # Here we are going through each sentence in corpus and generating a result based on half of the sentence.
-    # Then, we do a corpus wide bleu score calculation on all generation. Seems like this should take a lot longer...
-    # this doesn't work, it just takes way too long
-    """references = []
-    predictions = []
-    # For each sentence in corpus
-    for category in dataset.all_categories:
-        for sentence in dataset.raw_text[category]:
-            print('sentence: ', sentence)
-            # Get length of sentence
-            sentence_length = len(sentence.split())
-            #print('sentence_length: ', sentence_length)
-
-            # Get first half of sentence
-            # If the sentence length < 2, just skip??
-            if sentence_length >= 2:
-                sentence_half = ' '.join(sentence.split()[:sentence_length//2])
-                generation_length = sentence_length//2
-            else:
-                sentence_half = sentence
-                generation_length = 1
-            #print('sentence_half: ', sentence_half)
-
-            # Generate prediction on the rest, up to the proper length
-            prediction = ' '.join(predict(model, sentence_half.lower(), category, dataset, generation_length=generation_length))
-            print('prediction: ', prediction)
-
-            # Add full sentences for both reference and prediction to arrays
-            references.append(sentence)
-            predictions.append(prediction)
     
-    # Compute full bleu score for all.
-    bleu = BLEU()
-
-    bleu_score = bleu.corpus_score(predictions, [references])
-    print('bleu score: ', bleu_score)"""
-
-    # Instead we do halfway prediction on a sample of 20 sentences or so from the set
-    scorer = BERTScorer(lang="en", rescale_with_baseline=True)
-
     references = []
     predictions = []
-
-    num_samples = 20
-    for _ in range(num_samples):
-        # Pick random category
-        category = random.choice(dataset.all_categories)
-
-        # Get all sentences of data
+    # For each dataset
+    for category in dataset.all_categories:
+        # Get data, and choose a random 15 percent to use as eval generation chunk
         data = dataset.raw_text[category]
+        num_eval_samples = int(len(data) * .15)
+        start = random.randint(0, len(data)-num_eval_samples)
+        end = start + num_eval_samples
+        eval_data = data[start:end]
 
-        # Get random sentence
-        sentence = data[random.randint(0, len(data)-1)]
+        # Iterate through all of data by choosing chunks of about 3-4 sentences length(60 tokens).
+        for i in range(0, len(eval_data), 60):
+            chunk = eval_data[i:i+60]
 
-        # Get length of sentence
-        sentence_length = len(sentence.split())
+            # For each chunk, take the first 70%, use as prompt, and evaluate bleu+bert on remaining 20 percent
+            prompt_chunk_len = int(len(chunk) * .7)
+            # For prompt and reference we need to change to lowercase, because the vocab only knows lowercase
+            prompt = [token.lower() for token in chunk[0:prompt_chunk_len]]
+            reference = [token.lower() for token in chunk[prompt_chunk_len:]]
+            generation_length = len(chunk) - prompt_chunk_len
+            #print('chunk: ', chunk)
+            #print('prompt: ', prompt)
+            #print('reference: ', reference)
 
-        # Get first half of sentence
-        # If the sentence length < 2, just use the word
-        if sentence_length >= 2:
-            sentence_half = ' '.join(sentence.split()[:sentence_length//2])
-            generation_length = sentence_length//2
-        else:
-            sentence_half = sentence
-            generation_length = 1
+            # Format input properly
+            # Format the input
+            sequence = dataset.vocab(prompt)
 
-        # Generate prediction on the rest, up to the proper length
-        prediction = ' '.join(predict(model, sentence_half.lower(), category, dataset, generation_length=generation_length))
-        
-        # Add full sentences for both reference and prediction to arrays
-        references.append(sentence)
-        predictions.append(prediction)
+            # Generate prediction on the rest, up to the proper length
+            prediction = predict_tokens(model, sequence, category, dataset, generation_length=generation_length)
+            
+            #print('prediction: ', prediction)
+            #print('prediction result only: ', prediction[len(prompt):])
+            # Add full sentences for both reference and prediction to arrays
+            references.append(' '.join(reference))
+            predictions.append(' '.join(prediction))
+
+    scorer = BERTScorer(lang="en", rescale_with_baseline=True)
 
     bleu = BLEU()
 
-    bleu_score = bleu.corpus_score(predictions, [references])
+    bleu_score = bleu.corpus_score(predictions, references)
 
     # Record in WandB
     wandb.log({"bleu_score":bleu_score.score})
@@ -371,13 +315,64 @@ def evaluate(model: nn.Module, dataset, src_mask) -> float:
     print('R: ', R)
     print('F1: ', F1)
     print(f"System level F1 score: {F1.mean()}")
+    print("bleu score: ", bleu_score)
 
     wandb.log({"system_level_f1_BERT":F1.mean()})
 
+    # Calculate simple fluency/repitition metric with predictions list
+    # predictions list should be a list of tokens
+    average = 0
+
+    # For each prediction
+    for prediction in predictions:
+        tokens = prediction.split(" ")
+        # Calculate number of unique tokens in prediction 
+        num_unique_tokens = len(set(tokens))
+        # divide num unique tokens/ by total num tokens
+        average += num_unique_tokens/len(tokens)
+        # The higher the value, the less repitition there is.
+
+    # Average score of all predictions
+    average = average/len(predictions)
+    wandb.log({"repitition":average})
+    
+    
     #CTRLEval?
 
     return evaluation_loss
 
+# This predict function is good for passing in a list of strings that have already been tokenized
+def predict_tokens(model: nn.Module, input, category: str, dataset, generation_length=100):
+
+    # In this function, we only want to return the predicted portion, not including the prompt.
+    prediction = []
+
+    # Tokenize input
+    sequence = torch.tensor(input).to(device)
+
+    # Format tensor to be in shape: batch_size, seq_len
+    sequence = sequence.reshape(1, -1)
+
+    category = dataset.category_tensor(category)[0].reshape(1, -1)
+
+    for _ in range(generation_length):
+        # Give transformer entire sequence
+        output = model(sequence, category)
+
+        # Take last generated sequence of highest probability
+        log_prob_vals, next_words = torch.topk(output[0,-1], k=10, dim=0)
+        next_word = random.choice(next_words.tolist())
+
+        # append to sequence
+        prediction.append(next_word)
+        sequence = torch.tensor(prediction).to(device).reshape(1, -1)
+
+    # Decode entire sequence
+    final_prediction = build_vocab.decode_vocab(dataset.vocab, prediction)
+
+    return final_prediction
+
+# This predict function is good for passsing raw text
 def predict(model: nn.Module, input: str, category: str, dataset, generation_length=100):
 
     # Format the input
@@ -420,7 +415,7 @@ def predict_wrapper(model, dataset, epoch, text_table = None):
 
         #print(' '.join(prediction))
 
-        with open('predictions.txt', 'a') as file:
+        with open('predictions.txt', 'a', encoding="utf-8") as file:
             file.write('\n')
             file.write('Category: ')
             file.write(category)
@@ -465,7 +460,7 @@ def train_wrapper():
     nhead = 2  # number of heads in nn.MultiheadAttention
     dropout = 0.2  # dropout probability
     lr = 5.0  # learning rates
-    num_epochs = 2
+    num_epochs = 50
     project_name = "transformer_test"
     
     # Normal
