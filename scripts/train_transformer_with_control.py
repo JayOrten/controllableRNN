@@ -718,10 +718,127 @@ def train_wrapper():
 
             run.finish()
 
+def train_wrapper_2():
+    # Create datasets
+    sequence_length = 256 # Length of one sequence
+    batch_size = 16 # Number of sequences in a batch
+
+    tag_type_books_6_sources = 'books_6_sources'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_6_sources)
+
+    ntokens_books_6 = books_6_dataset.uniq_words  # size of vocabulary
+
+    emsize = 200  # embedding dimension
+    d_hid = 1024  # dimension of the feedforward network model in nn.TransformerEncoder
+    nlayers = 6  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+    nhead = 2  # number of heads in nn.MultiheadAttention
+    dropout = 0.2  # dropout probability
+    lrs = [5.0, 3.0, .1, .01, .001]  # learning rates
+    num_epochs = 1
+    project_name = "transformer_train_lr_july_17"
+
+    # Tests for consistency first
+
+    for i in range(5):
+        lr = lrs[0]
+        run = wandb.init(name='normal_books_6_'+str(lr)+'_'+str(i),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_6_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers,
+                                'lr':lr
+                            },
+                            reinit=True
+                            )
+            
+        model = transformer_model_category.TransformerModel_with_Category(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+        train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=1)
+
+        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books_6_sources+"_"+str(lr)+'_'+str(i)+".pt"
+
+        torch.save(model.state_dict(), file_path)
+
+        run.finish()
+
+        run = wandb.init(name='edited_3_books_6_'+str(lr)+'_'+str(i),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_6_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers,
+                                'lr':lr
+                            },
+                            reinit=True
+                            )
+            
+        model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+        train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=0)
+
+        file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books_6_sources+"_"+str(lr)+'_'+str(i)+".pt"
+
+        torch.save(model.state_dict(), file_path)
+
+        run.finish()
+    
+    # Test different learning rates
+
+    for lr in lrs:
+        run = wandb.init(name='normal_books_6_'+str(lr),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_6_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers,
+                                'lr':lr
+                            },
+                            reinit=True
+                            )
+            
+        model = transformer_model_category.TransformerModel_with_Category(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+        train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=1)
+
+        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books_6_sources+"_"+str(lr)+".pt"
+
+        torch.save(model.state_dict(), file_path)
+
+        run.finish()
+
+        run = wandb.init(name='edited_3_books_6_'+str(lr),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_6_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers,
+                                'lr':lr
+                            },
+                            reinit=True
+                            )
+            
+        model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+        train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=0)
+
+        file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books_6_sources+"_"+str(lr)+".pt"
+
+        torch.save(model.state_dict(), file_path)
+
+        run.finish()
 
 def main():
     wandb.login()
-    train_wrapper()
+    train_wrapper_2()
 
 
 if __name__ == "__main__":
