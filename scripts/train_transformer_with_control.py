@@ -157,12 +157,20 @@ def train(model: nn.Module,
           num_epochs: int,
           ntokens: int,
           lr: float,
-          type=0) -> None:
+          type=0,
+          scheduler=True,
+          optimizer='SGD') -> None:
     model.train()  # turn on train mode
     dataloader = DataLoader(dataset, batch_size=batch_size, drop_last=True)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr) # Could try adam
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
+
+    if optimizer=='Adam':
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr) # Could try adam
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    if scheduler:
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
     
     total_loss = 0.
     log_interval = dataset.num_batches-1 # Logging every epoch
@@ -192,7 +200,8 @@ def train(model: nn.Module,
 
             total_loss += loss.item()
             if batch % log_interval == 0 and batch > 0:
-                lr = scheduler.get_last_lr()[0]
+                if scheduler:
+                    lr = scheduler.get_last_lr()[0]
                 ms_per_batch = (time.time() - start_time) * 1000 / log_interval
                 cur_loss = total_loss / log_interval
                 ppl = math.exp(cur_loss)
@@ -213,7 +222,8 @@ def train(model: nn.Module,
 
                 predict_wrapper(model, dataset, epoch, text_table)
 
-        scheduler.step()
+        if scheduler:
+            scheduler.step()
 
     wandb.log({"training_samples" : text_table})
 
@@ -718,6 +728,7 @@ def train_wrapper():
 
             run.finish()
 
+# Consistency test and learning rate experimentation
 def train_wrapper_2():
     # Create datasets
     sequence_length = 256 # Length of one sequence
@@ -836,9 +847,104 @@ def train_wrapper_2():
 
         run.finish()
 
+# Further experimentation with learning rates
+def train_wrapper_3():
+    # Create datasets
+    sequence_length = 256 # Length of one sequence
+    batch_size = 16 # Number of sequences in a batch
+
+    tag_type_books_6_sources = 'books_6_sources'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_6_sources)
+
+    ntokens_books_6 = books_6_dataset.uniq_words  # size of vocabulary
+
+    emsize = 200  # embedding dimension
+    d_hid = 512  # dimension of the feedforward network model in nn.TransformerEncoder
+    nlayers = 6  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+    nhead = 2  # number of heads in nn.MultiheadAttention
+    dropout = 0.2  # dropout probability
+    #lrs = [5.0, 3.0, .1, .01, .001]  # learning rates
+    num_epochs = 1
+    project_name = "transformer_train_lr_july_24"
+
+    # Test different learning rates
+
+    # Test default: 5.0 with scheduler
+    # 4.0 with scheduler
+    # 6.0 with scheduler
+    # 0.1 no scheduler
+    # 0.01 no scheduler
+    # 0.001 no scheduler
+    # Try adam with scheduler?
+    # 5.0
+    # 3.0
+    # Adam with no scheduler
+    # .1
+    # .01
+    # .001
+    # next to do: test different gammas with scheduler
+    lrs = [5.0, 4.0, 6.0, 0.1, 0.01, 0.001, 5.0, 3.0, 0.1, 0.01, 0.001]
+    schedulers = [True,True,True,False,False,False,True,True,False,False,False,]
+    optimizers = ['SGD','SGD','SGD','SGD','SGD','SGD','Adam','Adam','Adam','Adam','Adam']
+
+    for i in range(len(lrs)):
+        lr = lrs[i]
+        scheduler = schedulers[i]
+        optimizer = optimizers[i]
+        run = wandb.init(name='normal_books_6_'+str(lr)+'_'+optimizer+'_'+str(scheduler),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_6_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers,
+                                'lr':lr,
+                                'scheduler':scheduler,
+                                'optimizer':optimizer
+                            },
+                            reinit=True
+                            )
+                
+        model = transformer_model_category.TransformerModel_with_Category(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+        train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, 1, scheduler, optimizer)
+
+        file_path = f"./trained_models/transformer_trained_normal_"+tag_type_books_6_sources+"_"+str(lr)+'_'+optimizer+'_'+str(scheduler)+".pt"
+
+        torch.save(model.state_dict(), file_path)
+
+        run.finish()
+
+
+        run = wandb.init(name='edited_3_books_6_'+str(lr)+'_'+optimizer+'_'+str(scheduler),
+                            project=project_name,
+                            config={
+                                'dataset':tag_type_books_6_sources,
+                                'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers,
+                                'lr':lr,
+                                'scheduler':scheduler,
+                                'optimizer':optimizer
+                            },
+                            reinit=True
+                            )
+                
+        model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+        train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, 0, scheduler, optimizer)
+
+        file_path = f"./trained_models/transformer_trained_edited_3_"+tag_type_books_6_sources+"_"+str(lr)+'_'+optimizer+'_'+str(scheduler)+".pt"
+
+        torch.save(model.state_dict(), file_path)
+
+        run.finish()
+
 def main():
     wandb.login()
-    train_wrapper_2()
+    train_wrapper_3()
 
 
 if __name__ == "__main__":
