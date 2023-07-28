@@ -42,7 +42,7 @@ def build_vocabulary_from_file(spacy_en, filename: str, lowercase=True):
                   "<garden>", 
                   "<music>", 
                   "<news>", 
-                  "<blog>", 
+                  "<blog>",
                   "<s>", 
                   "</s>", 
                   "<blank>", 

@@ -48,6 +48,7 @@ class Transformer_Dataset(torch.utils.data.Dataset):
         self.load_words(vocab_file, token_files)
     
         self.uniq_words = len(self.vocab)
+        print('size of vocab: ', self.uniq_words)
 
     # data_folder needs to be like '../data/reviews/'
     def setup_categories(self, data_folder):
@@ -165,9 +166,9 @@ def train(model: nn.Module,
     criterion = nn.CrossEntropyLoss()
 
     if optimizer=='Adam':
-        optimizer = torch.optim.SGD(model.parameters(), lr=lr) # Could try adam
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr) # Could try adam
     else:
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
     if scheduler:
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
@@ -942,9 +943,113 @@ def train_wrapper_3():
 
         run.finish()
 
+# Run training for a long time
+def train_wrapper_4():
+    # Create datasets
+    sequence_length = 256 # Length of one sequence
+    batch_size = 16 # Number of sequences in a batch
+
+    tag_type_books_6_sources = 'books_6_sources'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_6_sources)
+
+    ntokens_books_6 = books_6_dataset.uniq_words  # size of vocabulary
+
+    emsize = 200  # embedding dimension
+    d_hid = 1024  # dimension of the feedforward network model in nn.TransformerEncoder
+    nlayers = 6  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+    nhead = 2  # number of heads in nn.MultiheadAttention
+    dropout = 0.2  # dropout probability
+    num_epochs = 1250
+    project_name = "transformer_train_lr_july_28"
+
+    lr = 5.0
+    scheduler = True
+    optimizer = 'SGD'
+    run = wandb.init(name='normal_books_6_long',
+                        project=project_name,
+                        config={
+                            'dataset':tag_type_books_6_sources,
+                            'epochs':num_epochs,
+                            'hidden_size':d_hid,
+                            'learning rate':lr,
+                            'nlayers':nlayers,
+                            'lr':lr,
+                            'scheduler':scheduler,
+                            'optimizer':optimizer
+                        },
+                        reinit=True
+                        )
+                
+    model = transformer_model_category.TransformerModel_with_Category(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+    train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, 1, scheduler, optimizer)
+
+    file_path = f"./trained_models/transformer_trained_normal_long.pt"
+
+    torch.save(model.state_dict(), file_path)
+
+    run.finish()
+
+    run = wandb.init(name='edited_3_books_6_long',
+                        project=project_name,
+                        config={
+                            'dataset':tag_type_books_6_sources,
+                            'epochs':num_epochs,
+                            'hidden_size':d_hid,
+                            'learning rate':lr,
+                            'nlayers':nlayers,
+                            'lr':lr,
+                            'scheduler':scheduler,
+                            'optimizer':optimizer
+                        },
+                        reinit=True
+                        )
+                
+    model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+    train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, 0, scheduler, optimizer)
+
+    file_path = f"./trained_models/transformer_trained_edited_3_long.pt"
+
+    torch.save(model.state_dict(), file_path)
+
+    run.finish()
+
+# Load datasets to check vocab sizes
+def check_vocab_sizes():
+    sequence_length = 256 # Length of one sequence
+    batch_size = 16 # Number of sequences in a batch
+    
+    # Languages
+    print('languages')
+    tag_type_languages_sources = 'languages'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_languages_sources)
+    # Books-2
+    print('books-2')
+    tag_type_books_2_sources = 'books_2_sources'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_2_sources)
+    # Books-3
+    print('books-3')
+    tag_type_books_3_sources = 'books_3_sources'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_3_sources)
+    # Books-6
+    print('books-6')
+    tag_type_books_6_sources = 'books_6_sources'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_6_sources)
+    # Scripts
+    print('scripts')
+    tag_type_scripts_sources = 'scripts'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_scripts_sources)
+    # Reviews
+    print('reviews')
+    tag_type_reviews_sources = 'reviews'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_reviews_sources)
+
+    
+
 def main():
     wandb.login()
-    train_wrapper_3()
+    train_wrapper_4()
 
 
 if __name__ == "__main__":
