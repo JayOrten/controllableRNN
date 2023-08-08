@@ -12,6 +12,7 @@ from sacrebleu.metrics import BLEU
 import nltk
 from nltk import tokenize
 from bert_score import BERTScorer
+import numpy as np
 
 import build_vocab
 import transformer_model_category
@@ -177,6 +178,7 @@ def train(model: nn.Module,
     log_interval = dataset.num_batches-1 # Logging every epoch
     start_time = time.time()
     text_table = wandb.Table(columns=["epoch", "category", "generation"])
+    value_table = wandb.Table(columns=["epoch", "BLEU", "BERTScore", "degeneracy"])
 
     # Simple switch to deal with concatenation types for testing
     if type == 0:
@@ -217,7 +219,7 @@ def train(model: nn.Module,
                 total_loss = 0
                 start_time = time.time()
             if batch % num_batches-1 == 0 and batch > 0:
-                eval_loss = evaluate(model, dataset, src_mask)
+                eval_loss = evaluate(model, dataset, src_mask, epoch, value_table)
                 print('EVAL LOSS: ', eval_loss)
                 wandb.log({"eval_loss":eval_loss})
 
@@ -227,12 +229,13 @@ def train(model: nn.Module,
             scheduler.step()
 
     wandb.log({"training_samples" : text_table})
+    wandb.log({"training_metrics" : value_table})
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
     """Generates an upper-triangular matrix of -inf, with zeros on diag."""
     return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
 
-def evaluate(model: nn.Module, dataset, src_mask) -> float:
+def evaluate(model: nn.Module, dataset, src_mask, epoch, value_table=None) -> float:
     model.eval()  # turn on evaluation mode
 
     criterion = nn.CrossEntropyLoss()
@@ -322,11 +325,14 @@ def evaluate(model: nn.Module, dataset, src_mask) -> float:
 
     # BERTScore
     P, R, F1 = scorer.score(predictions, references)
-    print('p: ', P)
-    print('R: ', R)
-    print('F1: ', F1)
+    #print('BERT p: ', P)
+    #print('BERT R: ', R)
+    #print('BERT F1: ', F1)
     print(f"System level F1 score: {F1.mean()}")
     print("bleu score: ", bleu_score)
+
+    #Shows plot for bertscore
+    #scorer.plot_example(predictions[0],references[0],fname='./plot.png')
 
     wandb.log({"system_level_f1_BERT":F1.mean()})
 
@@ -346,8 +352,22 @@ def evaluate(model: nn.Module, dataset, src_mask) -> float:
     # Average score of all predictions
     average = average/len(predictions)
     wandb.log({"repitition":average})
+
+    # Calculate degeneracy
+    degeneracy_average = 0
+    for prediction in predictions:
+        # Find max occurrence of a given word
+        tokens = prediction.split(" ")
+        unique, counts = np.unique(tokens, return_counts=True)
+        index = np.argmax(counts)
+        print('prediction: ', tokens)
+        print('counts[index]: ', counts[index])
+        degeneracy_average += counts[index]
+    degeneracy_average = degeneracy_average/len(predictions)
     
-    
+    # Add metrics to table
+    if value_table:
+        value_table.add_data(epoch, bleu_score.score, F1.mean(), degeneracy_average)
     #CTRLEval?
 
     return evaluation_loss
@@ -949,18 +969,18 @@ def train_wrapper_4():
     sequence_length = 256 # Length of one sequence
     batch_size = 16 # Number of sequences in a batch
 
-    tag_type_books_6_sources = 'books_6_sources'
+    tag_type_books_6_sources = 'books_3_sources'
     books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_6_sources)
 
     ntokens_books_6 = books_6_dataset.uniq_words  # size of vocabulary
 
     emsize = 200  # embedding dimension
-    d_hid = 1024  # dimension of the feedforward network model in nn.TransformerEncoder
-    nlayers = 6  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+    d_hid = 512  # dimension of the feedforward network model in nn.TransformerEncoder
+    nlayers = 4  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
     nhead = 2  # number of heads in nn.MultiheadAttention
     dropout = 0.2  # dropout probability
-    num_epochs = 1250
-    project_name = "transformer_train_lr_july_28"
+    num_epochs = 5
+    project_name = "transformer_train_lr_august_7"
 
     lr = 5.0
     scheduler = True
@@ -1015,6 +1035,83 @@ def train_wrapper_4():
 
     run.finish()
 
+# BLEU table test
+def train_wrapper_5():
+    
+    # Create datasets
+    sequence_length = 256 # Length of one sequence
+    batch_size = 16 # Number of sequences in a batch
+
+    tag_type_books_6_sources = 'books_6_sources'
+    books_6_dataset = Transformer_Dataset(sequence_length, batch_size, tag_type_books_6_sources)
+    
+    ntokens_books_6 = books_6_dataset.uniq_words  # size of vocabulary
+
+    emsize = 200  # embedding dimension
+    d_hid = 1024  # dimension of the feedforward network model in nn.TransformerEncoder
+    nlayers = 6 # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+    nhead = 2  # number of heads in nn.MultiheadAttention
+    dropout = 0.2  # dropout probability
+    lr = 5.0  # learning rates
+    num_epochs = 50
+    project_name = "bleu_tables"
+    
+    # Normal
+    print('---------------------')
+    print('NORMAL')
+
+    #BOOKS 6 SOURCES 
+
+    run = wandb.init(name='normal_books_6_'+str(d_hid)+'_'+str(nlayers),
+                    project=project_name,
+                    config={
+                        'dataset':tag_type_books_6_sources,
+                        'epochs':num_epochs,
+                            'hidden_size':d_hid,
+                            'learning rate':lr,
+                            'nlayers':nlayers
+                        },
+                        reinit=True
+                        )
+            
+    model = transformer_model_category.TransformerModel_with_Category(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+    train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=1)
+
+    file_path = f"./trained_models/BLEUtransformer_trained_normal_"+tag_type_books_6_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
+
+    torch.save(model.state_dict(), file_path)
+
+    run.finish()
+
+    # Edited 3
+    print('---------------------')
+    print('EDITED 3')
+
+    #BOOKS 6 SOURCES
+
+    run = wandb.init(name='edited_3_books_6_'+str(d_hid)+'_'+str(nlayers),
+                    project=project_name,
+                    config={
+                        'dataset':tag_type_books_6_sources,
+                        'epochs':num_epochs,
+                        'hidden_size':d_hid,
+                        'learning rate':lr,
+                        'nlayers':nlayers
+                    },
+                    reinit=True
+                    )
+            
+    model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+    train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=0)
+
+    file_path = f"./trained_models/BLEUtransformer_trained_edited_3_"+tag_type_books_6_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
+
+    torch.save(model.state_dict(), file_path)
+
+    run.finish()
+
 # Load datasets to check vocab sizes
 def check_vocab_sizes():
     sequence_length = 256 # Length of one sequence
@@ -1049,7 +1146,7 @@ def check_vocab_sizes():
 
 def main():
     wandb.login()
-    train_wrapper_4()
+    train_wrapper_5()
 
 
 if __name__ == "__main__":
