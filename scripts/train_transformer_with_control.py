@@ -364,6 +364,8 @@ def evaluate(model: nn.Module, dataset, src_mask, epoch, value_table=None) -> fl
         print('counts[index]: ', counts[index])
         degeneracy_average += counts[index]
     degeneracy_average = degeneracy_average/len(predictions)
+
+    wandb.log({"degeneracy_average":degeneracy_average})
     
     # Add metrics to table
     if value_table:
@@ -1054,63 +1056,64 @@ def train_wrapper_5():
     dropout = 0.2  # dropout probability
     lr = 5.0  # learning rates
     num_epochs = 50
-    project_name = "bleu_tables"
-    
-    # Normal
-    print('---------------------')
-    print('NORMAL')
+    project_name = "bleu_tables_aug_9"
 
-    #BOOKS 6 SOURCES 
+    for i in range(10):
+        # Normal
+        print('---------------------')
+        print('NORMAL')
 
-    run = wandb.init(name='normal_books_6_'+str(d_hid)+'_'+str(nlayers),
-                    project=project_name,
-                    config={
-                        'dataset':tag_type_books_6_sources,
-                        'epochs':num_epochs,
+        #BOOKS 6 SOURCES 
+
+        run = wandb.init(name='normal_books_6_'+str(d_hid)+'_'+str(nlayers)+'_'+str(i),
+                        project=project_name,
+                        config={
+                            'dataset':tag_type_books_6_sources,
+                            'epochs':num_epochs,
+                                'hidden_size':d_hid,
+                                'learning rate':lr,
+                                'nlayers':nlayers
+                            },
+                            reinit=True
+                            )
+                
+        model = transformer_model_category.TransformerModel_with_Category(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
+        train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=1)
+
+        file_path = f"./trained_models/BLEUtransformer_trained_normal_"+tag_type_books_6_sources+"_"+str(d_hid)+"_"+str(nlayers)+'_'+str(i)+".pt"
+
+        torch.save(model.state_dict(), file_path)
+
+        run.finish()
+
+        # Edited 3
+        print('---------------------')
+        print('EDITED 3')
+
+        #BOOKS 6 SOURCES
+
+        run = wandb.init(name='edited_3_books_6_'+str(d_hid)+'_'+str(nlayers)+'_'+str(i),
+                        project=project_name,
+                        config={
+                            'dataset':tag_type_books_6_sources,
+                            'epochs':num_epochs,
                             'hidden_size':d_hid,
                             'learning rate':lr,
                             'nlayers':nlayers
                         },
                         reinit=True
                         )
-            
-    model = transformer_model_category.TransformerModel_with_Category(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
+                
+        model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-    train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=1)
+        train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=0)
 
-    file_path = f"./trained_models/BLEUtransformer_trained_normal_"+tag_type_books_6_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
+        file_path = f"./trained_models/BLEUtransformer_trained_edited_3_"+tag_type_books_6_sources+"_"+str(d_hid)+"_"+str(nlayers)+'_'+str(i)+".pt"
 
-    torch.save(model.state_dict(), file_path)
+        torch.save(model.state_dict(), file_path)
 
-    run.finish()
-
-    # Edited 3
-    print('---------------------')
-    print('EDITED 3')
-
-    #BOOKS 6 SOURCES
-
-    run = wandb.init(name='edited_3_books_6_'+str(d_hid)+'_'+str(nlayers),
-                    project=project_name,
-                    config={
-                        'dataset':tag_type_books_6_sources,
-                        'epochs':num_epochs,
-                        'hidden_size':d_hid,
-                        'learning rate':lr,
-                        'nlayers':nlayers
-                    },
-                    reinit=True
-                    )
-            
-    model = transformer_model_category_edited_3.TransformerModel_with_Category_edited(ntokens_books_6, emsize, nhead, d_hid, nlayers, dropout).to(device)
-
-    train(model, books_6_dataset, batch_size, sequence_length, num_epochs, ntokens_books_6, lr, type=0)
-
-    file_path = f"./trained_models/BLEUtransformer_trained_edited_3_"+tag_type_books_6_sources+"_"+str(d_hid)+"_"+str(nlayers)+".pt"
-
-    torch.save(model.state_dict(), file_path)
-
-    run.finish()
+        run.finish()
 
 # Load datasets to check vocab sizes
 def check_vocab_sizes():
